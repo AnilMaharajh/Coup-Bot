@@ -1,0 +1,56 @@
+Class Player
+All of the players actions are done in this class
+
+Income
+Take 1 coin from the pile
+    Increases the player coin total by 1
+
+Foreign Aid
+Take 2 coin, however it can be blocked with a duke
+    Increases the player coin total by 2
+
+Coup
+Pay 7 coins and launch a coup on another player, taking away a card away from the player
+Automatically uses it once a user has 10 or more coins
+
+Assassin
+Attempts to kill another player using 3 coins.
+Player can block using a contessa
+    Has a single parameter, the player who is being assassinated
+    Then 30 seconds will pass to allow the player to block with a contessa
+    If not the player losses a card or lose the game if they only have one card
+
+Captain
+Can take 2 coins from another player.
+If the player only has one coin, take that coin
+Ambassador or captain can block steals
+    Has a single parameter, the player who is getting robbed
+    Then 30 seconds will pass to allow the player to block
+Duke
+Can take 3 coins from the pile
+    Increases their coin by 3
+
+Ambassador
+Exchanges cards with the court by taking the first 2 cards from the deck and selecting one.
+The you exchange and the remaining card goes to the bottom of the pile
+    Uses pop2 to get 2 cards from the top of the deck
+    Player has 45 seconds to choose a card to exchange.
+    The card that is left over and exchanged go to the bottom of the deck.
+
+Block - Foreign Aid
+Duke can stop a player from taking foreign aid
+
+Block - Assassination
+Blocks assassination with contessa, the player who launches the assassination still has to pay the 3 coins
+
+Block - Stealing
+Blocks stealing with ambassador/captain
+
+Block - Fail
+If the opposing player does not have a card, they must lose it and put it in the bottom of the deck
+
+Class Coup
+The coup class controls the flow of the game, from deciding who wins or not and whose turn it is
+
+Players are generated before the class is created
+There must be at least 2 players, if not an error is raised
