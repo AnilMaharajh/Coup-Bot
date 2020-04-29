@@ -186,7 +186,7 @@ def select_opponent(act: str, player: Player, players: List[Player]) -> Player:
     index = 0
     for opponent in players:
         if player != opponent:
-            print("{}. {}".format(index, opponent))
+            print("{}. {}".format(index, opponent.name))
         else:
             player_index = index
         index += 1
@@ -305,19 +305,19 @@ def exchange(player: Player, deck: Stack, players: List[Player]):
                 print("Invalid type")
         # Player selects the card they want
         selection = deck.pop2()
-        for card in selection:
-            print("0. {}".format(card[0]))
-            print("1. {}".format(card[1]))
-            condition = True
-            while condition:
-                try:
-                    choice = int(input("Which card do you want?"))
-                    if 0 <= choice <= 1:
-                        player.cards.append(selection[choice])
-                    else:
-                        print("Invalid index number!")
-                except TypeError:
-                    print("Invalid type")
+        print("0. {}".format(selection[0]))
+        print("1. {}".format(selection[1]))
+        condition = True
+        while condition:
+            try:
+                choice = int(input("Which card do you want?"))
+                if 0 <= choice <= 1:
+                    player.cards.append(selection[choice])
+                    condition = False
+                else:
+                    print("Invalid index number!")
+            except TypeError:
+                print("Invalid type")
     else:
         challenge(player, condition, deck, players, "ambassador")
 
