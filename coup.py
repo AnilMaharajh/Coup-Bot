@@ -102,15 +102,107 @@ def play():
                 while number != 0:
                     name = input("What is their name?")
                     player = Player(name)
-                    players.append(name)
                     player.cards = deck.pop2()
                     total_coins -= 2
                     players.append(player)
+                    number -= 1
                 condition = False
             else:
                 print("Invalid number of players")
         except TypeError:
             print("Invalid value")
+
+    index = 0
+    while len(players) != 1:
+        action(players[index], deck, players)
+        if index == len(players) - 1:
+            index = 0
+        else:
+            index += 1
+    print("{} wins the game".format(players[0].name))
+
+
+def action(player: Player, deck: Stack, players: List[Player]):
+    """
+    PLayer chooses an action from the list
+    """
+    show_cards(player)
+    print("Coins: {}".format(player.coin))
+    if player.coin >= 10:
+        b_player = select_opponent("coup", player, players)
+        player.coin -= 7
+        lose_card(b_player, deck, players)
+
+    print("0. Income")
+    print("1. Foreign Aid")
+    print("2. Tax")
+    print("3. Coup")
+    print("4. Assassinate")
+    print("5. Steal")
+    print("6. Exchange")
+
+    condition = True
+    while condition:
+        try:
+            choice = int(input("{}, what action do you commit?".format(player.name)))
+            if 0 <= choice <= 6:
+                condition = False
+            else:
+                print("Invalid index")
+        except TypeError:
+            print("Invalid type")
+
+    if choice == 0:
+        income(player)
+    elif choice == 1:
+        foreign_aid(player, deck, players)
+    elif choice == 2:
+        tax(player, players, deck)
+    elif choice == 3:
+        if player.coin >= 7:
+            b_player = select_opponent("coup", player, players)
+            player.coin -= 7
+            lose_card(b_player, deck, players)
+        else:
+            print("Don't have enough coin")
+            action(player, deck, players)
+    elif choice == 4:
+        if player.coin >= 3:
+            b_player = select_opponent("assassinate", player, players)
+            assassinate(player, b_player, deck, players)
+        else:
+            print("Don't have enough coin")
+            action(player, deck, players)
+    elif choice == 5:
+        steal(player, select_opponent("steal", player, players), deck, players)
+    else:
+        exchange(player, deck, players)
+
+
+def select_opponent(act: str, player: Player, players: List[Player]) -> Player:
+    """
+    Player selects another player to attack
+    """
+    index = 0
+    for opponent in players:
+        if player != opponent:
+            print("{}. {}".format(index, opponent))
+        else:
+            player_index = index
+        index += 1
+
+    condition = True
+    while condition:
+        try:
+            index = int(input("Which player do you want to {}?".format(act)))
+            if index == player_index:
+                print("You can't {} from yourself silly".format(act))
+            elif 0 <= index < len(players):
+                return players[index]
+            else:
+                print("Invalid index")
+        except TypeError:
+            print("Invalid type")
 
 
 def generate_deck() -> Stack:
@@ -135,7 +227,7 @@ def income(player: Player) -> None:
     player.coin += 1
 
 
-def foreign_aid(player: Player, players: list[Player]) -> None:
+def foreign_aid(player: Player, deck: Stack, players: List[Player]) -> None:
     """
     Player takes 2 coins, can be blocked with a duke
     """
@@ -143,10 +235,10 @@ def foreign_aid(player: Player, players: list[Player]) -> None:
     if condition is None:
         player.coin += 2
     else:
-        challenge(player, condition, "duke")
+        challenge(player, condition, deck, players, "duke")
 
 
-def assassinate(player: Player, b_player: Player, players: List[Player]):
+def assassinate(player: Player, b_player: Player, deck: Stack, players: List[Player]):
     """
     Player uses assassin to take away another player influence
     Uses 3 coins
@@ -155,12 +247,12 @@ def assassinate(player: Player, b_player: Player, players: List[Player]):
     player.coin -= 3
     condition = player_check(player, players)
     if condition is None:
-        lose_card(b_player)
+        lose_card(b_player, deck, players)
     else:
-        challenge(player, b_player, "assassin")
+        challenge(player, b_player, deck, players, "assassin")
 
 
-def steal(player: Player, b_player: Player):
+def steal(player: Player, b_player: Player, deck: Stack, players: List[Player]):
     """
     Player uses captain to take 2 coins from another player
     If the player only has one coin, take that coin
@@ -177,10 +269,10 @@ def steal(player: Player, b_player: Player):
             b_player.coin -= 2
             player.coin += 2
     else:
-        challenge(player, b_player, "captain")
+        challenge(player, b_player, deck, players, "captain")
 
 
-def tax(player: Player, players: List[Player]):
+def tax(player: Player, players: List[Player], deck: Stack):
     """
     Player use the duke to get 3 coins
     """
@@ -188,7 +280,7 @@ def tax(player: Player, players: List[Player]):
     if condition is None:
         player.coin += 3
     else:
-        challenge(player, condition, "duke")
+        challenge(player, condition, deck, players, "duke")
 
 
 def exchange(player: Player, deck: Stack, players: List[Player]):
@@ -227,7 +319,7 @@ def exchange(player: Player, deck: Stack, players: List[Player]):
                 except TypeError:
                     print("Invalid type")
     else:
-        challenge(player, condition, "ambassador")
+        challenge(player, condition, deck, players, "ambassador")
 
 
 def show_cards(player: Player):
@@ -235,9 +327,11 @@ def show_cards(player: Player):
     Shows the players cards
     """
     index = 0
+    print("{}'s cards".format(player.name))
     for card in player.cards:
         print("{}. {}".format(index, card))
         index += 1
+    print("")
 
 
 def player_check(player: Player, players: List[Player]) -> Optional[Player]:
@@ -247,13 +341,14 @@ def player_check(player: Player, players: List[Player]) -> Optional[Player]:
     index = 0
     while index < len(players):
         if players[index] != player:
-            choice = input("Do you calleth the bluff (Y/N)")
+            choice = input("{}, do you calleth the bluff (Y/N)".format(players[index].name))
             if choice in ["y", "Y"]:
                 return players[index]
+        index += 1
     return None
 
 
-def challenge(player: Player, b_player: Player, influence: str):
+def challenge(player: Player, b_player: Player, deck: Stack, players: List[Player], influence: str):
     """
     b_player the one who is challenging player to show their card if they are lying
     Player can show their card, and prove that they have it. Thus, b_player must put away one of their influence
@@ -262,19 +357,12 @@ def challenge(player: Player, b_player: Player, influence: str):
     show_cards(player)
     choice = int(input("What card to show?"))
     if player.cards[choice] == influence:
-        lose_card(b_player)
+        lose_card(b_player, deck, players)
     else:
-
-    # if player decides to show their correct card
-    #   Can either keep it, or put in the deck to exchange for the first card
-    #   b_player must give up one of their cards
-    #   checks if b_player has 0 cards, if so they are popped out of the list, eliminating them from the game
-
-    # or player decides to discard one of their cards
-    # checks if player has 0 cards, if so they are popped out of the list, eliminating them from the game
+        lose_card(player, deck, players)
 
 
-def lose_card(player: Player):
+def lose_card(player: Player, deck: Stack, players: List[Player]):
     """
     Player chosen must lose one of their influence
     If they no longer have any cards, they are out of the game
@@ -290,5 +378,15 @@ def lose_card(player: Player):
             if 0 <= choice <= index - 1:
                 card = player.cards.pop(choice)
                 print("{} loses {}".format(player.name, card))
+                deck.push_bottom(card)
+                condition = False
         except TypeError:
             print("Invalid value")
+
+    # If the player has no cards left
+    if len(player.cards) == 0:
+        players.pop(players.index(player))
+
+
+if __name__ == "__main__":
+    play()
