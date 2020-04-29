@@ -49,8 +49,4 @@ Blocks stealing with ambassador/captain
 Block - Fail
 If the opposing player does not have a card, they must lose it and put it in the bottom of the deck
 
-Class Coup
-The coup class controls the flow of the game, from deciding who wins or not and whose turn it is
 
-Players are generated before the class is created
-There must be at least 2 players, if not an error is raised

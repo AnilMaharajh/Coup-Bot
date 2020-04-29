@@ -76,12 +76,41 @@ class Player:
     """
     Allows the player to command actions
     """
-    coin = int
-    cards = List[str]
+    name: str
+    coin: int
+    cards: List[str]
+    choice: bool
 
-    def __init__(self) -> None:
+    def __init__(self, name: str) -> None:
+        self.name = name
         self.coin = 2
         self.cards = []
+
+
+def play():
+    """
+    Sets up a game of coup inside the python terminal
+    """
+    total_coins = 50
+    deck = generate_deck()
+    condition = True
+    players = []
+    while condition:
+        try:
+            number = int(input("How many players? (2-6)"))
+            if 2 <= number <= 6:
+                while number != 0:
+                    name = input("What is their name?")
+                    player = Player(name)
+                    players.append(name)
+                    player.cards = deck.pop2()
+                    total_coins -= 2
+                    players.append(player)
+                condition = False
+            else:
+                print("Invalid number of players")
+        except TypeError:
+            print("Invalid value")
 
 
 def generate_deck() -> Stack:
@@ -99,100 +128,167 @@ def generate_deck() -> Stack:
     return deck
 
 
-class Coup:
+def income(player: Player) -> None:
     """
-    Creates a game of coup with up to 2-6 players
-    There must be at least 2 players
+    Player takes 1 coin
     """
-    players: List[Player]
-    card_stack: Stack
-    total_coins: int
+    player.coin += 1
 
-    def __init__(self, player1: Player = None, player2: Player = None, player3: Player = None, player4: Player = None,
-                 player5: Player = None, player6: Player = None):
-        """
-        Creates environment for the game to be played
-        Players are generated and given two influence
-        Play order is set
-        """
-        if player2 is None:
-            print("Cannot generate game, need one other person")
 
-        self.card_stack = generate_deck()
-        players = []
+def foreign_aid(player: Player, players: list[Player]) -> None:
+    """
+    Player takes 2 coins, can be blocked with a duke
+    """
+    condition = player_check(player, players)
+    if condition is None:
+        player.coin += 2
+    else:
+        challenge(player, condition, "duke")
 
-        player1.cards = self.card_stack.pop2()
-        players.append(player1)
-        player2.cards = self.card_stack.pop2()
-        players.append(player2)
-        self.total_coins = 46
-        self.remaining_players = 2
 
-        if player3 is not None:
-            player3.cards = self.card_stack.pop2()
-            players.append(player3)
-            self.total_coins -= 2
-            self.remaining_players += 1
-        if player4 is not None:
-            player4.cards = self.card_stack.pop2()
-            players.append(player4)
-            self.total_coins -= 2
-            self.remaining_players += 1
-        if player5 is not None:
-            player5.cards = self.card_stack.pop2()
-            players.append(player5)
-            self.total_coins -= 2
-            self.remaining_players += 1
-        if player6 is not None:
-            player6.cards = self.card_stack.pop2()
-            players.append(player6)
-            self.total_coins -= 2
-            self.remaining_players += 1
+def assassinate(player: Player, b_player: Player, players: List[Player]):
+    """
+    Player uses assassin to take away another player influence
+    Uses 3 coins
+    Contessa can block
+    """
+    player.coin -= 3
+    condition = player_check(player, players)
+    if condition is None:
+        lose_card(b_player)
+    else:
+        challenge(player, b_player, "assassin")
 
-    def income(self, player: Player) -> None:
-        """
-        Player takes 1 coin
-        """
-        player.coin += 1
 
-    def foreign_aid(self, player: Player) -> None:
-        """
-        Player takes 2 coins, can be blocked with a duke
-        """
-        condition = self.player_check(player)
-        if condition is None:
-            player.coin += 2
+def steal(player: Player, b_player: Player):
+    """
+    Player uses captain to take 2 coins from another player
+    If the player only has one coin, take that coin
+    Ambassador or captain can block steals
+    """
+    condition = player_check(player, [b_player])
+    if condition is None:
+        if b_player.coin == 1:
+            b_player.coin -= 1
+            player.coin = 1
+        elif b_player == 0:
+            print("What a waste of a turn")
         else:
-            self.challenge(player, condition, "foreign")
-
-    def assassinate(self, player, b_player):
-        player.coin -= 3
-        condition = self.player_check(player)
-        if condition is None:
+            b_player.coin -= 2
+            player.coin += 2
+    else:
+        challenge(player, b_player, "captain")
 
 
-    def player_check(self, player: Player) -> Optional[Player]:
-        """
-        Allow opposing players to block or bluff the player committing an action
-        If nobody responds after 30 seconds, player action goes through
-        """
-        # All the other players can bypass the 30 seconds by responding N
-        # If one player responds with Y, they challenge the player
-        return None
-
-    def challenge(self, player: Player, b_player: Player, action: str):
-        """
-        b_player the one who is challenging player to show their card if they are lying
-        Player can show their card, and prove that they have it. Thus, b_player must put away one of their influence
-        Player can show their card regardless of its influence and put it in the deck, or put it in the deck
-        """
-
-        # if player decides to show their correct card
-        #   Can either keep it, or put in the deck to exchange for the first card
-        #   b_player must give up one of their cards
-        #   checks if b_player has 0 cards, if so they are popped out of the list, eliminating them from the game
-
-        # or player decides to discard one of their cards
-        # checks if player has 0 cards, if so they are popped out of the list, eliminating them from the game
+def tax(player: Player, players: List[Player]):
+    """
+    Player use the duke to get 3 coins
+    """
+    condition = player_check(player, players)
+    if condition is None:
+        player.coin += 3
+    else:
+        challenge(player, condition, "duke")
 
 
+def exchange(player: Player, deck: Stack, players: List[Player]):
+    """
+    Player uses the ambassador to change one of their influences by taking the top 2 cards of the deck, and choosing one
+    The remaining cards go to the bottom
+    """
+    condition = player_check(player, players)
+    if condition is None:
+        # Asks the player for the card they want gone
+        show_cards(player)
+        condition = True
+        while condition:
+            try:
+                choice = int(input("What card do you want to exchange?"))
+                if 0 <= choice <= len(player.cards):
+                    deck.push_bottom(player.cards.pop(choice))
+                    condition = False
+                else:
+                    print("Invalid index number!")
+            except TypeError:
+                print("Invalid type")
+        # Player selects the card they want
+        selection = deck.pop2()
+        for card in selection:
+            print("0. {}".format(card[0]))
+            print("1. {}".format(card[1]))
+            condition = True
+            while condition:
+                try:
+                    choice = int(input("Which card do you want?"))
+                    if 0 <= choice <= 1:
+                        player.cards.append(selection[choice])
+                    else:
+                        print("Invalid index number!")
+                except TypeError:
+                    print("Invalid type")
+    else:
+        challenge(player, condition, "ambassador")
+
+
+def show_cards(player: Player):
+    """
+    Shows the players cards
+    """
+    index = 0
+    for card in player.cards:
+        print("{}. {}".format(index, card))
+        index += 1
+
+
+def player_check(player: Player, players: List[Player]) -> Optional[Player]:
+    """
+    Allow opposing players to block or bluff the player committing an action
+    """
+    index = 0
+    while index < len(players):
+        if players[index] != player:
+            choice = input("Do you calleth the bluff (Y/N)")
+            if choice in ["y", "Y"]:
+                return players[index]
+    return None
+
+
+def challenge(player: Player, b_player: Player, influence: str):
+    """
+    b_player the one who is challenging player to show their card if they are lying
+    Player can show their card, and prove that they have it. Thus, b_player must put away one of their influence
+    Player can show their card regardless of its influence and put it in the deck, or put it in the deck
+    """
+    show_cards(player)
+    choice = int(input("What card to show?"))
+    if player.cards[choice] == influence:
+        lose_card(b_player)
+    else:
+
+    # if player decides to show their correct card
+    #   Can either keep it, or put in the deck to exchange for the first card
+    #   b_player must give up one of their cards
+    #   checks if b_player has 0 cards, if so they are popped out of the list, eliminating them from the game
+
+    # or player decides to discard one of their cards
+    # checks if player has 0 cards, if so they are popped out of the list, eliminating them from the game
+
+
+def lose_card(player: Player):
+    """
+    Player chosen must lose one of their influence
+    If they no longer have any cards, they are out of the game
+    """
+    index = 0
+    for card in player.cards:
+        print("{}. {}".format(index, card))
+        index += 1
+    condition = True
+    while condition:
+        try:
+            choice = int(input("Which card to discard?"))
+            if 0 <= choice <= index - 1:
+                card = player.cards.pop(choice)
+                print("{} loses {}".format(player.name, card))
+        except TypeError:
+            print("Invalid value")
