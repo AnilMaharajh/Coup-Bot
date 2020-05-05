@@ -10,10 +10,15 @@ TOKEN = "Njg2Mzk1ODU0NjU5MTI1MzQ1.XmWoXA.mzQOJaPytBGPMmu8x77PREFViOQ"
 
 PLAYERS = []
 GAME_STATE = [False]
-CURRENT_PLAYER = []
+CURRENT_PLAYER = [None]
 CARD_PICS = {"captain": "Captain.jpg", "duke": "Duke.jpg",
              "ambassador": "Ambassador.jpg", "assassin": "Assassin.png",
              "contessa": "Contessa.png"}
+# Checks if all the players agree to allow the current player to commit an action
+CONDITION = False
+C_INDEX = 0
+BLOCK = [None]
+C_ACTION = [None]
 
 
 @client.event
@@ -156,8 +161,10 @@ async def game(ctx, *players):
                 PLAYERS.append(play)
                 total += 1
 
-            CURRENT_PLAYER[0] = 0, total
-            await ctx.send("It is {} turn".format(PLAYERS[CURRENT_PLAYER[0][0]].name))
+            # The current player is the player first in PLAYERS
+            # This keeps track on how many players are left, and current index for PLAYERS
+            CURRENT_PLAYER[0] = [PLAYERS[0], total, 0]
+            await ctx.send("It is {} turn".format(CURRENT_PLAYER[0][0].name))
             await ctx.send(embed=command_list())
 
         else:
@@ -173,10 +180,10 @@ def command_list():
     embed.add_field(name='Income:', value="//income")
     embed.add_field(name='Foreign Aid:', value="//aid")
     embed.add_field(name='Tax:', value="//tax")
-    embed.add_field(name='Coup:', value="//coup")
-    embed.add_field(name='Assassinate:', value="//assassinate")
-    embed.add_field(name='Steal:', value="//steal")
-    embed.add_field(name='Exchange:', value="//exchange")
+    embed.add_field(name='Coup:', value="//coup @user")
+    embed.add_field(name='Assassinate:', value="//assassinate @user")
+    embed.add_field(name='Steal:', value="//steal @user")
+    embed.add_field(name='Exchange:', value="//exchange @user")
     return embed
 
 
@@ -189,6 +196,58 @@ async def show_cards(player: Player):
     for card in player.cards:
         path = "Images"
         await player.user.dm_channel.send(file=discord.File(f'{path}\{CARD_PICS[card]}'))
+
+
+@client.command()
+async def income(ctx) -> None:
+    """
+    Player takes 1 coin
+    """
+    if ctx.author == CURRENT_PLAYER[0][0].user:
+        CURRENT_PLAYER[0][0].coin += 1
+        await ctx.send("{} now has {} coins".format(CURRENT_PLAYER[0][0].name, CURRENT_PLAYER[0][0].coin))
+        await ctx.send(next_player())
+
+    else:
+        await ctx.send("Oi, wait your turn")
+
+
+@client.command()
+async def aid(ctx) -> None:
+    """
+    Player takes 2 coins, can be blocked with a duke
+    """
+    C_ACTION[0] = "aid"
+
+
+def next_player():
+    """
+    The next player in PLAYERS, goes next
+    Unless it reaches the end, where it starts back to the first player
+    Returns a string, telling the next persons turn
+    If there is only one player left, that person wins
+    """
+    # If there is one player left, declare victory, and set game_state to false
+    if CURRENT_PLAYER[0][1] == 1:
+        GAME_STATE[0] = True
+        return "{} has asserted dominance and won".format(CURRENT_PLAYER[0][0].name)
+    else:
+        if CURRENT_PLAYER[0][2] + 1 > CURRENT_PLAYER[0][1]:
+            CURRENT_PLAYER[0][0], CURRENT_PLAYER[0][2] = PLAYERS[0], 0
+        else:
+            CURRENT_PLAYER[0][2] += 1
+            CURRENT_PLAYER[0][0] = PLAYERS[CURRENT_PLAYER[0][2]]
+        return "It is now {} turn".format(CURRENT_PLAYER[0][0].name)
+
+
+def player_check():
+    """
+    Allow opposing players to call a bluff or block the current player committing an action
+    True means they believe, the current player
+    Otherwise false the player is either calling a bluff or blocking
+    """
+    
+
 
 
 # Launches the bot on discord
