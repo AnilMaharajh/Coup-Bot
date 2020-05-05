@@ -1,10 +1,25 @@
 import discord
+import os
 from discord.ext import commands
 from typing import Any, List, Optional
 import random
 
 client = commands.Bot(command_prefix='//')
-client.run("Njg2Mzk1ODU0NjU5MTI1MzQ1.XmWoXA.mzQOJaPytBGPMmu8x77PREFViOQ")
+# Is used to launch the bot, DO NOT SHARE IT
+TOKEN = "Njg2Mzk1ODU0NjU5MTI1MzQ1.XmWoXA.mzQOJaPytBGPMmu8x77PREFViOQ"
+
+PLAYERS = []
+GAME_STATE = [False]
+CURRENT_PLAYER = []
+CARD_PICS = {"captain": "Captain.jpg", "duke": "Duke.jpg",
+             "ambassador": "Ambassador.jpg", "assassin": "Assassin.png",
+             "contessa": "Contessa.png"}
+
+
+@client.event
+async def on_ready():
+    # console message to confirm bot has logged in
+    print('We have logged in as {0.user}'.format(client))
 
 
 class Stack:
@@ -77,21 +92,104 @@ class EmptyStackError(Exception):
     pass
 
 
-@client.event
-async def on_ready():
-    # console message to confirm bot has logged in
-    print('We have logged in as {0.user}'.format(client))
-
-
-@client.command
-async def coup(ctx, *players):
+class Player:
     """
-    To add players to a game of coup, you must mention them
+    Allows the player to command actions
+    """
+    user: discord.member
+    name: str
+    id: int
+    coin: int
+    cards: List[str]
+    choice: bool
+
+    def __init__(self, user: discord.member) -> None:
+        # If the user has a nickname
+        if user.nick is None:
+            self.name = user.name
+        else:
+            self.name = user.nick
+        self.user = user
+        self.id = user.id
+        self.coin = 2
+        self.cards = []
+
+
+def generate_deck() -> Stack:
+    """
+    Shuffles the deck of cards and returns said deck
+    """
+    deck = Stack()
+    cards = ["captain", "duke", "ambassador", "assassin", "contessa", "captain", "duke", "ambassador", "assassin",
+             "contessa", "captain", "duke", "ambassador", "assassin", "contessa"]
+    random.shuffle(cards)
+    length_cards = len(cards)
+    while length_cards != 0:
+        deck.push(cards.pop(-1))
+        length_cards -= 1
+    return deck
+
+
+@client.command()
+async def game(ctx, *players):
+    """
+    To add players to a game of coup, you must mention up to 1-5 users.
+    The user who initializes it, is a player in the game
     Total of 2-6 players can play the game
     Any additional players are ignored
     """
-    print("work")
-    for player in players:
-        print(player)
+    # Resets the players for each game
+    if GAME_STATE[0]:
+        await ctx.send("Game is in progress, wait until it finishes")
+    else:
+        if len(players) >= 2:
+            deck = generate_deck()
+            await ctx.send("Now creating coup game with: ")
+            # Total represents the total number of players in the game
+            total = 0
+            for player in players[0:4]:
+                user = ctx.guild.get_member(int(player[2:-1]))
+                await ctx.send(user.name)
+                play = Player(user)
+                play.cards = deck.pop2()
+                await show_cards(play)
+                PLAYERS.append(play)
+                total += 1
 
-    await ctx.send("Now creating coup game with: ")
+            CURRENT_PLAYER[0] = 0, total
+            await ctx.send("It is {} turn".format(PLAYERS[CURRENT_PLAYER[0][0]].name))
+            await ctx.send(embed=command_list())
+
+        else:
+            await ctx.send("Not enough players")
+
+
+def command_list():
+    """
+    Returns an embed of all the commands
+    """
+    embed = discord.Embed()
+    embed.add_field(name='Action', value="Command")
+    embed.add_field(name='Income:', value="//income")
+    embed.add_field(name='Foreign Aid:', value="//aid")
+    embed.add_field(name='Tax:', value="//tax")
+    embed.add_field(name='Coup:', value="//coup")
+    embed.add_field(name='Assassinate:', value="//assassinate")
+    embed.add_field(name='Steal:', value="//steal")
+    embed.add_field(name='Exchange:', value="//exchange")
+    return embed
+
+
+async def show_cards(player: Player):
+    """
+    Shows the players cards
+    """
+    await player.user.create_dm()
+    await player.user.dm_channel.send("{}'s cards\n{} coins".format(player.name, player.coin))
+    for card in player.cards:
+        path = "Images"
+        await player.user.dm_channel.send(file=discord.File(f'{path}\{CARD_PICS[card]}'))
+
+
+# Launches the bot on discord
+client.run(TOKEN)
