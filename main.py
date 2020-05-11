@@ -16,9 +16,9 @@ CARD_PICS = {"captain": "Captain.jpg", "duke": "Duke.jpg",
              "contessa": "Contessa.png"}
 PATH = "Images"
 # Checks if all the players agree to allow the current player to commit an action
-CONDITION = False
+CONDITION = [False]
 C_INDEX = [0]
-BLOCK = [None]
+BLOCK = [False]
 C_ACTION = [None]
 C_PLAYERS = []
 
@@ -252,16 +252,13 @@ def player_check() -> str:
     True means they believe, the current player
     Otherwise false the player is either calling a bluff or blocking
     """
-    whose_turn = "{} do you want to bluff or block?\n//allow means no\n" \
+    # Skips asking the current player
+    if PLAYERS[C_INDEX[0]].user == CURRENT_PLAYER[0][0].user:
+        C_INDEX[0] += 1
+    whose_turn = "{} do you want to bluff or block?\n//allow means you believe them\n" \
                  "//block means you'll block and action with one of your influences\n" \
                  "//bluff means you believe that the current player does not have that " \
-                 "influence".format(C_PLAYERS[C_INDEX[0]])
-    # Skips asking the current player
-    if C_INDEX[0] + 1 == CURRENT_PLAYER[2]:
-        C_INDEX[0] += 2
-    else:
-        C_INDEX[0] += 1
-
+                 "influence".format(C_PLAYERS[C_INDEX[0]].name)
     return whose_turn
 
 
@@ -282,10 +279,16 @@ async def allow(ctx):
     Player allows the current player to commit an action
     """
     if ctx.author == C_PLAYERS[C_INDEX[0]].user:
-        turn = player_check()
-        await ctx.send(turn)
+        C_INDEX[0] += 1
+        if len(PLAYERS) <= C_INDEX[0]:
+            text = action()
+            await ctx.send(text)
+            text = next_player()
+            await ctx.send(text)
+        else:
+            await ctx.send(player_check())
     else:
-        await ctx.send("Wait ya turn ")
+        await ctx.send("Wait ya turn {}".format(ctx.author.nick))
 
 
 @client.command()
@@ -298,6 +301,20 @@ async def bluff(ctx):
     """
     if ctx.author == C_PLAYERS[C_INDEX[0]].user:
         await ctx.send("{} you must show your cards using //show_card!".format(CURRENT_PLAYER[0].name))
+    else:
+        await ctx.send("Wait ya turn")
+
+
+@client.command()
+async def block(ctx):
+    """
+    PLayer believes that the current player is lying about having an influence
+    Thus the current player must show what card they have
+    If they do have it, the player who called the bluff must discard one of their cards
+    Otherwise, the current player does not have it, therefore must discard it
+    """
+    if ctx.author == C_PLAYERS[C_INDEX[0]].user:
+        await ctx.send("{} you must show your cards using //show_card!".format(C_PLAYERS[C_INDEX[0]].name))
     else:
         await ctx.send("Wait ya turn")
 
@@ -329,20 +346,45 @@ async def show_card(ctx, index: int):
             else:
                 await ctx.send("{} discarded {}".format(C_PLAYERS[C_INDEX[0]].name, discarded_card))
 
+    elif ctx.author == CURRENT_PLAYER[0].user:
+        card = CURRENT_PLAYER[0].cards[index]
+        ctx.send(file=discord.File(f'{PATH}\{CARD_PICS[card]}'))
+        if card == C_ACTION:
+            # If the current player only has one card left, it is immediately discarded and they are out of the game
+            if len(C_PLAYERS[C_INDEX[0]].cards) == 1:
+                discarded_card = C_PLAYERS[C_INDEX[0]].cards.pop(0)
+                await ctx.send("{} discarded {} and is out of the game".format(C_PLAYERS[C_INDEX[0]].name,
+                                                                               discarded_card))
+                lose()
+            else:
+                await ctx.send("{} discard a card!\n Use //discard index".format(C_PLAYERS[C_INDEX[0]].name))
+        else:
+            discarded_card = C_PLAYERS[C_INDEX[0]].cards.pop(0)
+            # If the player has no cards left
+            if len(C_PLAYERS[C_INDEX[0]].cards) == 0:
+                await ctx.send(
+                    "{} discarded {} and is out of the game".format(C_PLAYERS[C_INDEX[0]].name, discarded_card))
+                lose()
+            else:
+                await ctx.send("{} discarded {}".format(C_PLAYERS[C_INDEX[0]].name, discarded_card))
+
     else:
         await ctx.send("Do you want everyone to know your cards?")
 
 
-def action():
+def action() -> str:
     """
     If the player action is allowed, they get to use their influence
     """
+    C_INDEX[0] = 0
     if C_ACTION[0] == "aid":
-        CURRENT_PLAYER[0].coin += 2
+        CURRENT_PLAYER[0][0].coin += 2
+        text = "{} now has {} coins".format(CURRENT_PLAYER[0][0].name, CURRENT_PLAYER[0][0].coin)
     elif C_ACTION[0] == "duke":
         CURRENT_PLAYER[0].coin += 3
     elif C_ACTION[0] == "captain":
         print("Oh lord this is dumb")
+    return text
 
 
 # Launches the bot on discord
