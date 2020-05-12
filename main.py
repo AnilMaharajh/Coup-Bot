@@ -90,7 +90,7 @@ class Stack:
         else:
             return self._items.pop()
 
-    def pop2(self) -> Any:
+    def pop2(self) -> List[Any]:
         """
         Remove and return the element at the top of this stack.
         Raise an EmptyStackError if this stack is empty.
@@ -194,10 +194,12 @@ def next_player():
     If there is only one player left, that person wins
     """
     # If there is one player left, declare victory, and set game_state to false
-    if CURRENT_PLAYER[0][1] == 1:
-        GAME_STATE[0] = True
+    if CURRENT_PLAYER[0][1] == 0:
+        GAME_STATE[0] = False
         return "{} has asserted dominance and won".format(CURRENT_PLAYER[0][0].name)
     else:
+        # If the index reaches the last player on the list, start from 0
+        print(CURRENT_PLAYER[0][2] + 1, CURRENT_PLAYER[0][1])
         if CURRENT_PLAYER[0][2] + 1 == CURRENT_PLAYER[0][1]:
             CURRENT_PLAYER[0][0], CURRENT_PLAYER[0][2] = PLAYERS[0], 0
         else:
@@ -243,7 +245,8 @@ def action() -> Optional[str]:
         CURRENT_PLAYER[0][0].coin += 2
         text = "{} now has {} coins".format(CURRENT_PLAYER[0][0].name, CURRENT_PLAYER[0][0].coin)
     elif C_ACTION[0] == "duke":
-        CURRENT_PLAYER[0].coin += 3
+        CURRENT_PLAYER[0][0].coin += 3
+        text = "{} now has {} coins".format(CURRENT_PLAYER[0][0].name, CURRENT_PLAYER[0][0].coin)
     elif C_ACTION[0] == "assassin" or C_ACTION[0] == "coup":
         if len(PLAYERS[C_INDEX[0]][0].cards) == 1:
             text = "{} discarded {} and is out of the game".format(PLAYERS[C_INDEX[0]][0].name,
@@ -266,16 +269,7 @@ def action() -> Optional[str]:
             text = "LOOOOOOOOOOOOOOOOOOL you just took 0 coins cause they had 0 coins\nWhat a meme"
     # Ambassador
     else:
-        EX_CARDS[1] = DECK[0].pop2()
-        await CURRENT_PLAYER[0][0].user.create_dm()
-        await CURRENT_PLAYER[0][0].user.dm_channel.send("{}'s cards\n{} coins"
-                                                        .format(CURRENT_PLAYER[0][0].name, CURRENT_PLAYER[0][0].coin))
-        index = 0
-        for card in CURRENT_PLAYER[0][0].cards:
-            await CURRENT_PLAYER[0][0].user.dm_channel.send("{}. {}".format(index, card))
-            await CURRENT_PLAYER[0][0].user.dm_channel.send(file=discord.File(f'{PATH}\{CARD_PICS[card]}'))
-            index += 1
-        text = "{} select ur card".format(CURRENT_PLAYER[0][0])
+        text = "{} select ur card by using //choice <index>".format(CURRENT_PLAYER[0][0].name)
 
     return text
 
@@ -309,7 +303,7 @@ async def game(ctx, *players):
 
             # The current player is the player first in PLAYERS
             # This keeps track on how many players are left, and current index for PLAYERS
-            CURRENT_PLAYER[0] = [PLAYERS[0], total, 0]
+            CURRENT_PLAYER[0] = [PLAYERS[0], total - 1, 0]
             await ctx.send("It is {} turn".format(CURRENT_PLAYER[0][0].name))
             await ctx.send(embed=command_list())
 
@@ -421,6 +415,14 @@ async def exchange(ctx, index: int) -> None:
     """
     C_ACTION[0] = "ambassador"
     EX_CARDS[0] = index
+    EX_CARDS[1] = DECK[0].pop2()
+    await CURRENT_PLAYER[0][0].user.create_dm()
+    index = 0
+    print(EX_CARDS[1])
+    for card in EX_CARDS[1]:
+        await CURRENT_PLAYER[0][0].user.dm_channel.send("{}. {}".format(index, card))
+        await CURRENT_PLAYER[0][0].user.dm_channel.send(file=discord.File(f'{PATH}\{CARD_PICS[card]}'))
+        index += 1
     await ctx.send(player_check())
 
 
@@ -432,8 +434,8 @@ async def allow(ctx):
     # If the Current player allows the block
     if (BLOCK[0] or C_ACTION in ["assassin", "captain"]) and ctx.author == CURRENT_PLAYER[0][0].user:
         C_INDEX[0] += 6
-    # If the player allows it iterates to the next player
 
+    # If the player allows it iterates to the next player
     elif ctx.author == PLAYERS[C_INDEX[0]].user:
         C_INDEX[0] += 1
     else:
@@ -441,10 +443,9 @@ async def allow(ctx):
 
     # Once all the players are asked, the current player action will go through
     if len(PLAYERS) <= C_INDEX[0]:
-        text = action()
-        await ctx.send(text)
-        text = next_player()
-        await ctx.send(text)
+        action()
+        if C_ACTION[0] in ["aid", "duke", "assassin"]:
+            await ctx.send(next_player())
     else:
         await ctx.send(player_check())
 
@@ -491,7 +492,6 @@ async def show_card(ctx, index: int):
     the other player must discard one of their cards
     """
     flag = False
-    print(PLAYERS[C_INDEX[0]].user, ctx.author, CURRENT_PLAYER[0][0].user)
     # If the challenger believes that the current player is lying
     if ctx.author == PLAYERS[C_INDEX[0]].user:
         challenger = PLAYERS[C_INDEX[0]]
@@ -522,6 +522,7 @@ async def show_card(ctx, index: int):
                 lose()
             else:
                 await ctx.send("{} discard a card!\n Use //discard index".format(actionman.name))
+            await show_cards(actionman)
         # Otherwise challenger loses said card
         else:
             discarded_card = challenger.cards.pop(0)
@@ -532,6 +533,10 @@ async def show_card(ctx, index: int):
                 lose()
             else:
                 await ctx.send("{} discarded {}".format(challenger.name, discarded_card))
+            if C_ACTION == "ambassador":
+                for index in range(0, 2):
+                    DECK[1].push_bottom(EX_CARDS[1].pop(0))
+            await show_cards(challenger)
 
         await ctx.send(action())
         await ctx.send(next_player())
@@ -557,13 +562,12 @@ async def choice(ctx, index: int):
     if ctx.author == CURRENT_PLAYER[0][0].user:
         if 0 <= index < 2:
             # Makes a list for the cards that must be put at the bottom of the deck
-            DECK.push_bottom(CURRENT_PLAYER[0][0].cards.pop(EX_CARDS[0]))
+            DECK[0].push_bottom(CURRENT_PLAYER[0][0].cards.pop(EX_CARDS[0]))
             CURRENT_PLAYER[0][0].cards.append(EX_CARDS[1].pop(index))
-            DECK.push_bottom(EX_CARDS[1][0].pop)
-
-
-
-
+            DECK[0].push_bottom(EX_CARDS[1].pop)
+            await show_cards(CURRENT_PLAYER[0][0])
+            await ctx.send(next_player())
+            await ctx.send(embed=command_list())
 
 
 # Launches the bot on discord
