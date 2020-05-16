@@ -8,6 +8,9 @@ client = commands.Bot(command_prefix='//')
 # Is used to launch the bot, DO NOT SHARE IT
 TOKEN = "Njg2Mzk1ODU0NjU5MTI1MzQ1.XmWoXA.mzQOJaPytBGPMmu8x77PREFViOQ"
 
+# How many coins are given at the beginning of a game
+# Used for debugging
+COINS = 3
 PLAYERS = []
 GAME_STATE = [False]
 CURRENT_PLAYER = [None]
@@ -22,9 +25,7 @@ C_INDEX = [0]
 BLOCK = [False]
 C_ACTION = [None]
 # Key is an action and the values are the influences that can block it
-BLOCKS = {"aid": ["duke"], "captain": ["captain", "ambassador"], "assassin": ["contessa"]}
-# Used for assassinations and steals
-VICTIM = [None]
+BLOCKS = {"aid": ["duke"], "captain": ["captain", "ambassador"], "assassin": ["contessa"], "duke": ["duke"]}
 # The card index that the current player wants to exchange
 # Index 1 contains 2 cards from the top of the deck
 EX_CARDS = [None, None]
@@ -125,7 +126,7 @@ class Player:
             self.name = user.nick
         self.user = user
         self.id = user.id
-        self.coin = 2
+        self.coin = COINS
         self.cards = []
 
 
@@ -156,7 +157,7 @@ def command_list():
     embed.add_field(name='Coup:', value="//coup @user")
     embed.add_field(name='Assassinate:', value="//assassinate @user")
     embed.add_field(name='Steal:', value="//steal @user")
-    embed.add_field(name='Exchange:', value="//exchange")
+    embed.add_field(name='Exchange:', value="// <index>")
     return embed
 
 
@@ -180,7 +181,8 @@ def find_player(player) -> Optional[Tuple[Player, int]]:
     index = 0
     while index < len(PLAYERS):
         if index != CURRENT_PLAYER[0][2]:
-            if player == PLAYERS[index].user:
+            print(player[2:-1], PLAYERS[index].id, type(PLAYERS[index].id))
+            if int(player[2:-1]) == PLAYERS[index].id:
                 return PLAYERS[index].user, index
         index += 1
     return None
@@ -194,12 +196,12 @@ def next_player():
     If there is only one player left, that person wins
     """
     # If there is one player left, declare victory, and set game_state to false
-    if CURRENT_PLAYER[0][1] == 0:
+    if CURRENT_PLAYER[0][1] == 1:
         GAME_STATE[0] = False
         return "{} has asserted dominance and won".format(CURRENT_PLAYER[0][0].name)
     else:
         # If the index reaches the last player on the list, start from 0
-        print(CURRENT_PLAYER[0][2] + 1, CURRENT_PLAYER[0][1])
+        C_INDEX[0] = 0
         if CURRENT_PLAYER[0][2] + 1 == CURRENT_PLAYER[0][1]:
             CURRENT_PLAYER[0][0], CURRENT_PLAYER[0][2] = PLAYERS[0], 0
         else:
@@ -214,13 +216,23 @@ def player_check() -> str:
     True means they believe, the current player
     Otherwise false the player is either calling a bluff or blocking
     """
+    print(C_INDEX[0])
     # Skips asking the current player
     if PLAYERS[C_INDEX[0]].user == CURRENT_PLAYER[0][0].user:
-        C_INDEX[0] += 1
-    whose_turn = "{} do you want to bluff or block?\n//allow means you believe them\n" \
-                 "//block means you'll block and action with one of your influences\n" \
-                 "//bluff means you believe that the current player does not have that " \
-                 "influence".format(PLAYERS[C_INDEX[0]].name)
+        # If the current player is last in PLAYERS
+        if C_INDEX[0] + 1 > CURRENT_PLAYER[0][1]:
+            C_INDEX[0] = 0
+        else:
+            C_INDEX[0] += 1
+    # Makes sure there isn't an IndexError
+    if C_INDEX[0] < len(PLAYERS):
+        whose_turn = "{} do you want to bluff or block?\n//allow means you believe them\n" \
+                     "//block means you'll block and action with one of your influences\n" \
+                     "//bluff means you believe that the current player does not have that " \
+                     "influence".format(PLAYERS[C_INDEX[0]].name)
+    # If the C_INDEX is greater the amount of players, then go to the next player and commit action for current
+    else:
+        whose_turn = "{}\n{}".format(action(), next_player())
     return whose_turn
 
 
@@ -239,22 +251,23 @@ def action() -> Optional[str]:
     """
     If the player action is allowed, they get to use their influence
     """
-    C_INDEX[0] = 0
     text = None
     if C_ACTION[0] == "aid":
         CURRENT_PLAYER[0][0].coin += 2
         text = "{} now has {} coins".format(CURRENT_PLAYER[0][0].name, CURRENT_PLAYER[0][0].coin)
     elif C_ACTION[0] == "duke":
+        C_INDEX[0] = 0
         CURRENT_PLAYER[0][0].coin += 3
         text = "{} now has {} coins".format(CURRENT_PLAYER[0][0].name, CURRENT_PLAYER[0][0].coin)
     elif C_ACTION[0] == "assassin" or C_ACTION[0] == "coup":
-        if len(PLAYERS[C_INDEX[0]][0].cards) == 1:
+        print(C_INDEX[0])
+        if len(PLAYERS[C_INDEX[0]].cards) == 1:
             text = "{} discarded {} and is out of the game".format(PLAYERS[C_INDEX[0]][0].name,
                                                                    PLAYERS[C_INDEX[0]][0].cards.pop(0))
             lose()
         else:
             C_ACTION[0] = "coup"
-            text = "{} use //discard_card to discard one of your cards".format(PLAYERS[C_INDEX[0]][0].name)
+            text = "{} use //discard <index> to discard one of your cards".format(PLAYERS[C_INDEX[0]].name)
     elif C_ACTION[0] == "captain":
         if PLAYERS[C_INDEX[0]].coin >= 2:
             PLAYERS[C_INDEX[0]].coin -= 2
@@ -267,9 +280,11 @@ def action() -> Optional[str]:
                 .format(PLAYERS[C_INDEX[0]].name, CURRENT_PLAYER[0][0].name, CURRENT_PLAYER[0][0].coin)
         else:
             text = "LOOOOOOOOOOOOOOOOOOL you just took 0 coins cause they had 0 coins\nWhat a meme"
+        C_INDEX[0] = 0
     # Ambassador
     else:
         text = "{} select ur card by using //choice <index>".format(CURRENT_PLAYER[0][0].name)
+        C_INDEX[0] = 0
 
     return text
 
@@ -303,7 +318,7 @@ async def game(ctx, *players):
 
             # The current player is the player first in PLAYERS
             # This keeps track on how many players are left, and current index for PLAYERS
-            CURRENT_PLAYER[0] = [PLAYERS[0], total - 1, 0]
+            CURRENT_PLAYER[0] = [PLAYERS[0], total, 0]
             await ctx.send("It is {} turn".format(CURRENT_PLAYER[0][0].name))
             await ctx.send(embed=command_list())
 
@@ -362,7 +377,7 @@ async def coup(ctx, player: str) -> None:
                 lose()
             else:
                 C_ACTION[0] = "coup"
-                await ctx.send("{} use //discard_card to discard one of your cards".format(challenger[0].name))
+                await ctx.send("{} use //discard <index> to discard one of your cards".format(challenger[0].name))
     else:
         await ctx.send("You require more coin")
 
@@ -374,13 +389,14 @@ async def assassinate(ctx, player: str) -> None:
     """
     if ctx.author == CURRENT_PLAYER[0][0].user:
         if CURRENT_PLAYER[0][0].coin >= 3:
-            C_ACTION[0] = ["assassin"]
+            C_ACTION[0] = "assassin"
             CURRENT_PLAYER[0][0].coin -= 3
             challenger = find_player(player)
             if challenger is None:
                 await ctx.send("Oi you dont exist")
                 return
             C_INDEX[0] = challenger[1]
+            print(C_INDEX[0])
             await ctx.send("{} do you believe in lies, then use //bluff or //block. Otherwise //allow"
                            .format(challenger[0]))
         else:
@@ -418,7 +434,6 @@ async def exchange(ctx, index: int) -> None:
     EX_CARDS[1] = DECK[0].pop2()
     await CURRENT_PLAYER[0][0].user.create_dm()
     index = 0
-    print(EX_CARDS[1])
     for card in EX_CARDS[1]:
         await CURRENT_PLAYER[0][0].user.dm_channel.send("{}. {}".format(index, card))
         await CURRENT_PLAYER[0][0].user.dm_channel.send(file=discord.File(f'{PATH}\{CARD_PICS[card]}'))
@@ -431,23 +446,33 @@ async def allow(ctx):
     """
     Player allows the current player to commit an action
     """
-    # If the Current player allows the block
-    if (BLOCK[0] or C_ACTION in ["assassin", "captain"]) and ctx.author == CURRENT_PLAYER[0][0].user:
-        C_INDEX[0] += 6
+    # If the Current player allows the block or an attack is occur to a player by a captain or assassin
+    if C_ACTION[0] in ["assassin", "captain"] and ctx.author == PLAYERS[C_INDEX[0]].user:
+        await ctx.send(action())
+    # If a block is initiated, go to the next player
+    elif BLOCK[0] and ctx.author == CURRENT_PLAYER[0][0].user:
+        C_INDEX[0] = 0
+        await ctx.send(next_player())
+        await ctx.send(embed=command_list())
 
     # If the player allows it iterates to the next player
-    elif ctx.author == PLAYERS[C_INDEX[0]].user:
-        C_INDEX[0] += 1
     else:
-        await ctx.send("Wait ya turn")
+        if ctx.author == PLAYERS[C_INDEX[0]].user:
+            # If the next player is the current increment by one
+            if PLAYERS[C_INDEX[0]].user == CURRENT_PLAYER[0][0].user:
+                C_INDEX[0] += 1
+            C_INDEX[0] += 1
+        else:
+            await ctx.send("Wait ya turn")
 
-    # Once all the players are asked, the current player action will go through
-    if len(PLAYERS) <= C_INDEX[0]:
-        action()
-        if C_ACTION[0] in ["aid", "duke", "assassin"]:
-            await ctx.send(next_player())
-    else:
-        await ctx.send(player_check())
+        # Once all the players are asked, the current player action will go through
+        if len(PLAYERS) <= C_INDEX[0]:
+            await ctx.send(action())
+            if C_ACTION[0] in ["aid", "duke", "assassin"]:
+                await ctx.send(next_player())
+                await ctx.send(embed=command_list())
+        else:
+            await ctx.send(player_check())
 
 
 @client.command()
@@ -475,14 +500,18 @@ async def block(ctx):
     If they do have it, the player who called the bluff must discard one of their cards
     Otherwise, the current player does not have it, therefore must discard it
     """
-    if ctx.author == PLAYERS[C_INDEX[0]].user:
-        await ctx.send("{} do you believe in the heart of the cards, that {} is lying!"
-                       "\nThen use //bluff\nOtherwise use //allow"
-                       .format(CURRENT_PLAYER[0][0].name, PLAYERS[C_INDEX[0]].name))
-        BLOCK[0] = True
 
+    if C_ACTION[0] in ["duke", "aid", "ambassador"]:
+        await ctx.send("Come on silly you can't block that!")
     else:
-        await ctx.send("Wait ya turn")
+        if ctx.author == PLAYERS[C_INDEX[0]].user:
+            await ctx.send("{} do you believe in the heart of the cards, that {} is lying!"
+                           "\nThen use //bluff\nOtherwise use //allow"
+                           .format(CURRENT_PLAYER[0][0].name, PLAYERS[C_INDEX[0]].name))
+            BLOCK[0] = True
+
+        else:
+            await ctx.send("Wait ya turn")
 
 
 @client.command()
@@ -505,6 +534,7 @@ async def show_card(ctx, index: int):
     else:
         await ctx.send("Do you want everyone to know your cards?")
 
+    print(actionman.name, challenger.name)
     # If a block was used to initialize this state, set block to false
     if BLOCK[0]:
         BLOCK[0] = False
@@ -513,7 +543,7 @@ async def show_card(ctx, index: int):
         card = challenger.cards[index]
         await ctx.send(file=discord.File(f'{PATH}\{CARD_PICS[card]}'))
         # If the challenger correctly has the card, actionman must lose one
-        if card == BLOCKS[C_ACTION]:
+        if card in BLOCKS[C_ACTION[0]]:
             # If the current player only has one card left, it is immediately discarded and they are out of the game
             if len(actionman.cards) == 1:
                 discarded_card = actionman.cards.pop(0)
@@ -537,9 +567,9 @@ async def show_card(ctx, index: int):
                 for index in range(0, 2):
                     DECK[1].push_bottom(EX_CARDS[1].pop(0))
             await show_cards(challenger)
-
-        await ctx.send(action())
+            await ctx.send(action())
         await ctx.send(next_player())
+        await ctx.send(embed=command_list())
 
 
 @client.command()
@@ -548,8 +578,14 @@ async def discard(ctx, index: int):
     If current player used a coup or an assassin, the challenger must discard one of their cards
     """
     if ctx.author == PLAYERS[C_INDEX[0]].user:
-        discarded_card = PLAYERS[C_INDEX[0]].cards.pop(index)
-        await ctx.send("{} discarded {}".format(PLAYERS[C_INDEX[0]].name, discarded_card))
+        if 0 <= index < len(PLAYERS[C_INDEX[0]].cards):
+            discarded_card = PLAYERS[C_INDEX[0]].cards.pop(index)
+            await ctx.send("{} discarded {}".format(PLAYERS[C_INDEX[0]].name, discarded_card))
+            await ctx.send(next_player())
+            await ctx.send(embed=command_list())
+
+        else:
+            await ctx.send("Invalid index, try again")
     else:
         await ctx.send("DO YOU WANT TO DISCARD!!!!!!")
 
@@ -559,7 +595,7 @@ async def choice(ctx, index: int):
     """
     After seeing what the top 2 cards are, the player can choose which one they want to exchange
     """
-    if ctx.author == CURRENT_PLAYER[0][0].user:
+    if ctx.author == PLAYERS[C_INDEX[0]].user:
         if 0 <= index < 2:
             # Makes a list for the cards that must be put at the bottom of the deck
             DECK[0].push_bottom(CURRENT_PLAYER[0][0].cards.pop(EX_CARDS[0]))
