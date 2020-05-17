@@ -3,13 +3,13 @@ from discord.ext import commands
 from typing import Any, List, Optional, Tuple
 import random
 
-client = commands.Bot(command_prefix='/')
+client = commands.Bot(command_prefix='//')
 # Is used to launch the bot, DO NOT SHARE IT
 TOKEN = "Njg2Mzk1ODU0NjU5MTI1MzQ1.XmWoXA.mzQOJaPytBGPMmu8x77PREFViOQ"
 
 # How many coins are given at the beginning of a game
 # Used for debugging
-COINS = 2
+COINS = 10
 PLAYERS = []
 GAME_STATE = [False]
 CURRENT_PLAYER = [None]
@@ -151,13 +151,13 @@ def command_list():
     """
     embed = discord.Embed()
     embed.add_field(name='Action', value="Command")
-    embed.add_field(name='Income:', value="/income")
-    embed.add_field(name='Foreign Aid:', value="/aid")
-    embed.add_field(name='Tax:', value="/tax")
-    embed.add_field(name='Coup:', value="/coup @user")
-    embed.add_field(name='Assassinate:', value="/assassinate @user")
-    embed.add_field(name='Steal:', value="/steal @user")
-    embed.add_field(name='Exchange:', value="/ exchange <index>")
+    embed.add_field(name='Income:', value="//income")
+    embed.add_field(name='Foreign Aid:', value="//aid")
+    embed.add_field(name='Tax:', value="//tax")
+    embed.add_field(name='Coup:', value="//coup @user")
+    embed.add_field(name='Assassinate:', value="//assassinate @user")
+    embed.add_field(name='Steal:', value="//steal @user")
+    embed.add_field(name='Exchange:', value="// exchange <index>")
     return embed
 
 
@@ -181,8 +181,12 @@ def find_player(player) -> Optional[Tuple[Player, int]]:
     index = 0
     while index < len(PLAYERS):
         if index != CURRENT_PLAYER[0][2]:
-            if int(player[2:-1]) == PLAYERS[index].id:
-                return PLAYERS[index].user, index
+            try:
+                if int(player[2:-1]) == PLAYERS[index].id:
+                    return PLAYERS[index].user, index
+            except ValueError:
+                if int(player[3:-1]) == PLAYERS[index].id:
+                    return PLAYERS[index].user, index
         index += 1
     return None
 
@@ -229,9 +233,9 @@ def player_check() -> str:
             C_INDEX[0] += 1
     # Makes sure there isn't an IndexError
     if C_INDEX[0] < len(PLAYERS):
-        whose_turn = "{} do you want to bluff or block?\n/allow means you believe them\n" \
-                     "/block means you'll block and action with one of your influences\n" \
-                     "/bluff means you believe that the current player does not have that " \
+        whose_turn = "{} do you want to bluff or block?\n//allow means you believe them\n" \
+                     "//block means you'll block and action with one of your influences\n" \
+                     "//bluff means you believe that the current player does not have that " \
                      "influence".format(PLAYERS[C_INDEX[0]].name)
     # If the C_INDEX is greater the amount of players, then go to the next player and commit action for current
     else:
@@ -271,7 +275,7 @@ def action() -> Optional[str]:
             text = next_player()
         else:
             C_ACTION[0] = "coup"
-            text = "{} use /discard <index> to discard one of your cards".format(PLAYERS[C_INDEX[0]].name)
+            text = "{} use //discard <index> to discard one of your cards".format(PLAYERS[C_INDEX[0]].name)
     elif C_ACTION[0] == "captain":
         if PLAYERS[C_INDEX[0]].coin >= 2:
             PLAYERS[C_INDEX[0]].coin -= 2
@@ -287,7 +291,7 @@ def action() -> Optional[str]:
         C_INDEX[0] = 0
     # Ambassador
     else:
-        text = "{} select ur card by using /choice <index>".format(CURRENT_PLAYER[0][0].name)
+        text = "{} select ur card by using //choice <index>".format(CURRENT_PLAYER[0][0].name)
         C_INDEX[0] = 0
 
     return text
@@ -312,7 +316,12 @@ async def game(ctx, *players):
             # Total represents the total number of players in the game
             total = 0
             for player in players[0:4]:
-                user = ctx.guild.get_member(int(player[2:-1]))
+                # If the user does not have a nickname
+                try:
+                    user = ctx.guild.get_member(int(player[2:-1]))
+                # If not it would cause an error
+                except ValueError:
+                    user = ctx.guild.get_member(int(player[3:-1]))
                 await ctx.send(user.name)
                 play = Player(user)
                 play.cards = DECK[0].pop2()
@@ -393,7 +402,7 @@ async def coup(ctx, player: str) -> None:
                 await ctx.send(next_player())
             else:
                 C_ACTION[0] = "coup"
-                await ctx.send("{} use /discard <index> to discard one of your cards"
+                await ctx.send("{} use //discard <index> to discard one of your cards"
                                .format(PLAYERS[challenger[1]].name))
         else:
             await ctx.send("You require more coin")
@@ -415,7 +424,7 @@ async def assassinate(ctx, player: str) -> None:
                 await ctx.send("Oi you dont exist")
                 return
             C_INDEX[0] = challenger[1]
-            await ctx.send("{} do you believe in lies, then use /bluff or /block. Otherwise /allow"
+            await ctx.send("{} do you believe in lies, then use //bluff or //block. Otherwise //allow"
                            .format(challenger[0]))
         else:
             await ctx.send("You require more coin")
@@ -435,8 +444,8 @@ async def steal(ctx, player: str) -> None:
             await ctx.send("Oi you dont exist")
             return
         C_INDEX[0] = challenger[1]
-        await ctx.send("{} do you allow this fool to steal your hard earn cash, then use /bluff or "
-                       "/block. Otherwise /allow".format(challenger[0]))
+        await ctx.send("{} do you allow this fool to steal your hard earn cash, then use //bluff or "
+                       "//block. Otherwise //allow".format(challenger[0]))
         await ctx.send(player_check())
     else:
         if MUST_COUP[0]:
@@ -512,9 +521,9 @@ async def bluff(ctx):
     """
     # If a block is initiated, the current player does not believe that the challenger does not have the influence
     if BLOCK[0] and ctx.author == CURRENT_PLAYER[0][0].user:
-        await ctx.send("{} you must show your cards using /show_card!".format(PLAYERS[C_INDEX[0]].name))
+        await ctx.send("{} you must show your cards using //show_card!".format(PLAYERS[C_INDEX[0]].name))
     elif ctx.author == PLAYERS[C_INDEX[0]].user:
-        await ctx.send("{} you must show your cards using /show_card!".format(CURRENT_PLAYER[0][0].name))
+        await ctx.send("{} you must show your cards using //show_card!".format(CURRENT_PLAYER[0][0].name))
     else:
         await ctx.send("Wait ya turn")
 
@@ -533,7 +542,7 @@ async def block(ctx):
     else:
         if ctx.author == PLAYERS[C_INDEX[0]].user:
             await ctx.send("{} do you believe in the heart of the cards, that {} is lying!"
-                           "\nThen use /bluff\nOtherwise use /allow"
+                           "\nThen use //bluff\nOtherwise use //allow"
                            .format(CURRENT_PLAYER[0][0].name, PLAYERS[C_INDEX[0]].name))
             BLOCK[0] = True
 
@@ -580,9 +589,9 @@ async def show_card(ctx, index: int):
                 lose()
                 await ctx.send(next_player())
             else:
-                await ctx.send("{} discard a card!\n Use /discard index".format(actionman.name))
+                await ctx.send("{} discard a card!\n Use //discard index".format(actionman.name))
             await show_cards(actionman)
-            await ctx.send("{} use /swap if you wish to swap out the card you just showed\nOtherwise do nothing"
+            await ctx.send("{} use //swap if you wish to swap out the card you just showed\nOtherwise do nothing"
                            .format(challenger.name))
 
         # Otherwise challenger loses said card
