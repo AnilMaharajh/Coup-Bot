@@ -10,7 +10,7 @@ TOKEN = "Njg2Mzk1ODU0NjU5MTI1MzQ1.XmWoXA.mzQOJaPytBGPMmu8x77PREFViOQ"
 
 # How many coins are given at the beginning of a game
 # Used for debugging
-COINS = 3
+COINS = 20
 PLAYERS = []
 GAME_STATE = [False]
 CURRENT_PLAYER = [None]
@@ -19,8 +19,6 @@ CARD_PICS = {"captain": "Captain.jpg", "duke": "Duke.jpg",
              "ambassador": "Ambassador.jpg", "assassin": "Assassin.png",
              "contessa": "Contessa.png"}
 PATH = "Images"
-# Checks if all the players agree to allow the current player to commit an action
-CONDITION = [False]
 C_INDEX = [0]
 BLOCK = [False]
 C_ACTION = [None]
@@ -198,6 +196,7 @@ def next_player():
     # If there is one player left, declare victory, and set game_state to false
     if CURRENT_PLAYER[0][1] == 1:
         GAME_STATE[0] = False
+        PLAYERS.pop(0)
         return "{} has asserted dominance and won".format(CURRENT_PLAYER[0][0].name)
     else:
         # If the index reaches the last player on the list, start from 0
@@ -262,9 +261,10 @@ def action() -> Optional[str]:
     elif C_ACTION[0] == "assassin" or C_ACTION[0] == "coup":
         print(C_INDEX[0])
         if len(PLAYERS[C_INDEX[0]].cards) == 1:
-            text = "{} discarded {} and is out of the game".format(PLAYERS[C_INDEX[0]][0].name,
-                                                                   PLAYERS[C_INDEX[0]][0].cards.pop(0))
+            text = "{} discarded {} and is out of the game".format(PLAYERS[C_INDEX[0]].name,
+                                                                   PLAYERS[C_INDEX[0]].cards.pop(0))
             lose()
+            text = next_player()
         else:
             C_ACTION[0] = "coup"
             text = "{} use //discard <index> to discard one of your cards".format(PLAYERS[C_INDEX[0]].name)
@@ -364,6 +364,7 @@ async def coup(ctx, player: str) -> None:
     Player uses 7 coins, to immediately take away a players influence
     """
     if ctx.author == CURRENT_PLAYER[0][0].user:
+        print(CURRENT_PLAYER[0][0].coin)
         if CURRENT_PLAYER[0][0].coin >= 7:
             CURRENT_PLAYER[0][0].coin -= 7
             challenger = find_player(player)
@@ -371,15 +372,19 @@ async def coup(ctx, player: str) -> None:
                 await ctx.send("Oi you dont exist")
                 return
             C_INDEX[0] = challenger[1]
-            if len(challenger[0].cards) == 1:
-                await ctx.send("{} discarded {} and is out of the game".format(challenger[0].name,
-                                                                               challenger[0].cards.pop(0)))
+            if len(PLAYERS[challenger[1]].cards) == 1:
+                await ctx.send("{} discarded {} and is out of the game".format(PLAYERS[challenger[1]].name,
+                                                                               PLAYERS[challenger[1]].cards.pop(0)))
                 lose()
+                await ctx.send(next_player())
             else:
                 C_ACTION[0] = "coup"
-                await ctx.send("{} use //discard <index> to discard one of your cards".format(challenger[0].name))
+                await ctx.send("{} use //discard <index> to discard one of your cards"
+                               .format(PLAYERS[challenger[1]].name))
+        else:
+            await ctx.send("You require more coin")
     else:
-        await ctx.send("You require more coin")
+        ctx.send("It may be the name of the game, but it doesn't mean you can be the game")
 
 
 @client.command()
@@ -396,7 +401,6 @@ async def assassinate(ctx, player: str) -> None:
                 await ctx.send("Oi you dont exist")
                 return
             C_INDEX[0] = challenger[1]
-            print(C_INDEX[0])
             await ctx.send("{} do you believe in lies, then use //bluff or //block. Otherwise //allow"
                            .format(challenger[0]))
         else:
@@ -543,13 +547,14 @@ async def show_card(ctx, index: int):
         card = challenger.cards[index]
         await ctx.send(file=discord.File(f'{PATH}\{CARD_PICS[card]}'))
         # If the challenger correctly has the card, actionman must lose one
-        if card in BLOCKS[C_ACTION[0]]:
+        if card == C_ACTION[0]:
             # If the current player only has one card left, it is immediately discarded and they are out of the game
             if len(actionman.cards) == 1:
                 discarded_card = actionman.cards.pop(0)
                 await ctx.send("{} discarded {} and is out of the game".format(actionman.name,
                                                                                discarded_card))
                 lose()
+                await ctx.send(next_player())
             else:
                 await ctx.send("{} discard a card!\n Use //discard index".format(actionman.name))
             await show_cards(actionman)
@@ -561,6 +566,7 @@ async def show_card(ctx, index: int):
                 await ctx.send(
                     "{} discarded {} and is out of the game".format(challenger.name, discarded_card))
                 lose()
+                await ctx.send(next_player())
             else:
                 await ctx.send("{} discarded {}".format(challenger.name, discarded_card))
             if C_ACTION == "ambassador":
@@ -568,8 +574,8 @@ async def show_card(ctx, index: int):
                     DECK[1].push_bottom(EX_CARDS[1].pop(0))
             await show_cards(challenger)
             await ctx.send(action())
-        await ctx.send(next_player())
-        await ctx.send(embed=command_list())
+            await ctx.send(next_player())
+            await ctx.send(embed=command_list())
 
 
 @client.command()
