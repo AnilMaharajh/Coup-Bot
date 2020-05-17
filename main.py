@@ -655,5 +655,16 @@ async def swap(ctx):
         await show_cards(swap[1])
 
 
+@client.command()
+async def end(ctx):
+    """
+    If the game ends up in a softlock, end the game
+    """
+    GAME_STATE[0] = False
+    for index in range(0, len(PLAYERS)):
+        PLAYERS.pop(0)
+    await ctx.send("Game has ended")
+
+
 # Launches the bot on discord
 client.run(TOKEN)
