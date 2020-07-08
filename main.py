@@ -90,7 +90,8 @@ async def income(ctx) -> None:
     """
     Player takes 1 coin
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user and not GAME_LIST[ctx.guild].must_coup:
+    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user \
+            and not GAME_LIST[ctx.guild].must_coup:
         await ctx.send(GAME_LIST[ctx.guild].income())
         await ctx.send(GAME_LIST[ctx.guild].GAME_LIST[ctx.guild].next_player())
 
@@ -106,7 +107,8 @@ async def aid(ctx) -> None:
     """
     Player takes 2 coins, can be blocked with a duke
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user and not GAME_LIST[ctx.guild].must_coup:
+    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user \
+            and not GAME_LIST[ctx.guild].must_coup:
         GAME_LIST[ctx.guild].current_action = "aid"
         await ctx.send(GAME_LIST[ctx.guild].player_check())
     else:
@@ -121,7 +123,8 @@ async def tax(ctx) -> None:
     """
     Player takes 3 coins, is used by the duke
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user and not GAME_LIST[ctx.guild].must_coup:
+    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user \
+            and not GAME_LIST[ctx.guild].must_coup:
         GAME_LIST[ctx.guild].current_action = "duke"
         await ctx.send(GAME_LIST[ctx.guild].player_check())
     else:
@@ -136,7 +139,8 @@ async def coup(ctx, player: str) -> None:
     """
     Player uses 7 coins, to immediately take away a players influence
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user and not GAME_LIST[ctx.guild].must_coup:
+    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user \
+            and not GAME_LIST[ctx.guild].must_coup:
         if GAME_LIST[ctx.guild].current_player.coin >= 7 or GAME_LIST[ctx.guild].must_coup:
             GAME_LIST[ctx.guild].must_coup = False
             GAME_LIST[ctx.guild].current_player.coin -= 7
@@ -148,7 +152,8 @@ async def coup(ctx, player: str) -> None:
             GAME_LIST[ctx.guild].challenger_index = challenger[1]
             if len(GAME_LIST[ctx.guild].challenger.cards) == 1:
                 await ctx.send("{} discarded {} and is out of the game".format(GAME_LIST[ctx.guild].challenger.name,
-                                                                               GAME_LIST[ctx.guild].challenger.cards.pop(0)))
+                                                                               GAME_LIST[ctx.guild].
+                                                                               challenger.cards.pop(0)))
                 GAME_LIST[ctx.guild].GAME_LIST[ctx.guild].lose()
                 await ctx.send(GAME_LIST[ctx.guild].GAME_LIST[ctx.guild].next_player())
             else:
@@ -166,7 +171,8 @@ async def assassinate(ctx, player: str) -> None:
     """
     Player uses 3 coins, to immediately take away a players influence
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user and not GAME_LIST[ctx.guild].must_coup:
+    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user \
+            and not GAME_LIST[ctx.guild].must_coup:
         if GAME_LIST[ctx.guild].current_player.user.coin >= 3:
             GAME_LIST[ctx.guild].current_action = "assassin"
             GAME_LIST[ctx.guild].current_player.coin -= 3
@@ -187,7 +193,8 @@ async def steal(ctx, player: str) -> None:
     """
     Player steals 2 coins from another player, uses captain
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user and not GAME_LIST[ctx.guild].must_coup:
+    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user \
+            and not GAME_LIST[ctx.guild].must_coup:
         GAME_LIST[ctx.guild].current_action = "captain"
         challenger = GAME_LIST[ctx.guild].find_player(player)
         if challenger is None:
@@ -207,7 +214,8 @@ async def exchange(ctx) -> None:
     """
     Player wants to exchange one of their cards
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user and not GAME_LIST[ctx.guild].must_coup:
+    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user \
+            and not GAME_LIST[ctx.guild].must_coup:
         GAME_LIST[ctx.guild].current_action = "ambassador"
         await ctx.send(GAME_LIST[ctx.guild].player_check())
     else:
@@ -230,9 +238,11 @@ async def allow(ctx):
     """
     Player allows the current player to commit an action
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user and not GAME_LIST[ctx.guild].must_coup:
+    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user \
+            and not GAME_LIST[ctx.guild].must_coup:
         # If the Current player allows the block or an attack is occur to a player by a captain or assassin
-        if GAME_LIST[ctx.guild].current_action in ["assassin", "captain"] and ctx.author == GAME_LIST[ctx.guild].challenger.user:
+        if GAME_LIST[ctx.guild].current_action in ["assassin", "captain"] and \
+                ctx.author == GAME_LIST[ctx.guild].challenger.user:
             await ctx.send(GAME_LIST[ctx.guild].action())
         # If a block is initiated, go to the next player
         elif GAME_LIST[ctx.guild].block and ctx.author == GAME_LIST[ctx.guild].current_player.user:
@@ -274,7 +284,8 @@ async def bluff(ctx):
     if ctx.guild in GAME_LIST and GAME_LIST[ctx.guild].block and ctx.author == GAME_LIST[ctx.guild].current_player.user:
         await ctx.send("{} you must show your cards using //show_card!".format(GAME_LIST[ctx.guild].challenger.name))
     elif ctx.author == GAME_LIST[ctx.guild].challenger.user:
-        await ctx.send("{} you must show your cards using //show_card!".format(GAME_LIST[ctx.guild].current_player.name))
+        await ctx.send("{} you must show your cards using //show_card!".format(
+            GAME_LIST[ctx.guild].current_player.name))
     else:
         await ctx.send("Wait ya turn")
 

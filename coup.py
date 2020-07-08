@@ -250,7 +250,6 @@ class Coup:
         """
         If the player action is allowed, they get to use their influence
         """
-        text = None
         if self.current_action == "aid":
             text = self.aid()
         elif self.current_action == "duke":
