@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Dict
 import random
 
 # Global Variables
@@ -109,6 +109,7 @@ class Coup:
 
     """
     coins: int
+    users: List[str]  # discord.member gets error
     players: List[Player]
     current_player: Player
     current_player_index: int
@@ -117,11 +118,14 @@ class Coup:
     challenger: Player
     challenger_index: int
     current_action: str
+    allow_check: Dict[str, bool]  # discord.member, bool
+    allow_check_number: int
     must_coup: bool
     block: bool
     # Swap is the card index the current player wants to replace
     swap: List
     exchange_cards: List[str]
+    play_again: bool
 
     def __init__(self):
         self.coins = 2
@@ -134,20 +138,12 @@ class Coup:
         self.challenger_index = 0
         self.current_action = ""
         self.must_coup = False
+        self.allow_check = {}
+        self.allow_check_number = 0
         self.swap = []
         self.exchange_cards = []
         self.block = False
-
-        # c_index = 0
-        # block = False
-        # c_action = None
-        # # Key is an action and the values are the influences that can block it
-        # # The card index that the current player wants to exchange
-        # # Index 1 contains 2 cards from the top of the deck
-        # ex_cards = [None, None]
-        # # If the current player has more than 10 coins, they must immediately coup another player on their turn
-        # must_coup = [False]
-        # swap = [None, None]
+        self.play_again = False
 
     def next_player(self):
         """
@@ -159,7 +155,9 @@ class Coup:
         # If there is one player left, declare victory, and set game_state to false
         if self.total_players_left == 1:
             self.players.pop(0)
-            return "{} has asserted dominance and won".format(self.current_player.name)
+            self.play_again = True
+            return "{} has asserted dominance and won\nIf you want to play with the same players, use //play_again".format(
+                self.current_player.name)
         else:
             # If the index reaches the last player on the list, start from 0
             self.challenger_index = 0
@@ -168,9 +166,11 @@ class Coup:
             else:
                 self.current_player_index += 1
                 self.current_player = self.players[self.current_player_index]
+
             if self.current_player.coin >= 10:
                 self.must_coup = True
-                return "{} you must coup another player!".format(self.current_player.name)
+                return "It is now {} turn. You must coup another player!".format(self.current_player.name)
+
             return "It is now {} turn".format(self.current_player.name)
 
     def player_check(self) -> str:
@@ -179,21 +179,22 @@ class Coup:
         True means they believe, the current player
         Otherwise false the player is either calling a bluff or blocking
         """
-        print(self.challenger_index)
         # Skips asking the current player
         if self.players[self.challenger_index].user == self.current_player.user:
             # If the current player is last in self.players
             if self.challenger_index + 1 > self.total_players_left:
                 self.challenger_index = 0
+                self.challenger = self.players[self.challenger_index]
             else:
                 self.challenger_index += 1
+                self.challenger = self.players[self.challenger_index]
         # Makes sure there isn't an IndexError
         if self.challenger_index < len(self.players):
-            whose_turn = "{} do you want to bluff or block?\n//allow means you believe them\n" \
+            whose_turn = "//allow means you believe them\n" \
                          "//block means you'll block the action with one of your influences\n" \
                          "//bluff means you believe that the current player does not have that " \
-                         "influence".format(self.players[self.challenger_index].name)
-        # If the C_INDEX is greater the amount of players, then go to the next player and commit action for current
+                         "influence"
+        # If the C_INDEX is greater than the amount of players, then go to the next player and commit action for current
         else:
             # Once everyone allows the ambassador action
             if self.current_action == "ambassador":
@@ -246,6 +247,37 @@ class Coup:
         self.total_players_left -= 1
         self.current_player = self.players[self.current_player_index]
 
+    def allow(self, player: discord.member):
+        if self.allow_check[player]:
+            return "{}, you already allowed".format(player.name)
+        else:
+            self.allow_check[player] = True
+            self.allow_check_number += 1
+            if self.allow_check_number == len(self.players) - 1:
+                self.allow_check_number = 0
+                # Resets allow_check back to false
+                for user in self.allow_check:
+                    self.allow_check[user] = False
+                return "{} allows {} action\n{}\n{}" \
+                    .format(player.name, self.current_player.name, self.action(), self.next_player())
+            return "{} allows {} action".format(player.name, self.current_player.name)
+
+    def block(self, player: discord.member):
+        # If a block has already been initialized
+        if self.block:
+            return "{} has already blocked {}.\n Check yourself, {}.\n" \
+                   "{} do you believe in the heart of the cards, that {} is lying!\n" \
+                   "Then use //bluff\nOtherwise use //allow".format(player.name, self.current_player.name, player.name,
+                                                                    self.current_player.name, self.challenger.name)
+        else:
+            self.block = True
+            print(player)
+            self.challenger = player
+            # Resets allow_check back to false
+            for user in self.allow_check:
+                self.allow_check[user] = False
+            return "{} has blocked {}!".format(player.name, self.current_player.name)
+
     def action(self) -> Optional[str]:
         """
         If the player action is allowed, they get to use their influence
@@ -260,9 +292,11 @@ class Coup:
             text = self.steal()
         # Ambassador
         else:
-            return "{} select ur card by using //choice <index>".format(self.current_player.name)
+            self.exchange_cards = self.deck.pop2()
+            return "{} select ur card by using //swap <index of the card you want to give up> <index of the card " \
+                   "\you want> in the channel".format(self.current_player.name)
 
-        return "{}\n{}".format(text, self.next_player())
+        return text
 
     def income(self) -> str:
         """
@@ -298,11 +332,19 @@ class Coup:
         return "{} now has {} coins\n{} now has {}".format(self.challenger.name, self.challenger.coin,
                                                            self.current_player.name, self.current_player.coin)
 
-    def exchange(self) -> str:
+    def exchange(self, card_away: int, card_want: int) -> str:
         """
         The current player uses the ambassador to switch of their cards with the the top 2 cards from the deck
         """
-        return "Oui"
+        # Pushes the card that the current player wants to swap to the bottom of the deck
+        self.deck.push_bottom(self.current_player.cards.pop(card_away))
+        # Appends the card the current player wants to their cards list
+        self.current_player.cards.append(self.exchange_cards.pop(card_want))
+        # Pushes the last card in self.exchange_cards to the bottom
+        self.deck.push_bottom(self.exchange_cards.pop(0))
+        return "Successfully exchanged cards"
+
+    def show_card(self, ):
 
 
 def generate_deck() -> Stack:
