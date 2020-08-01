@@ -271,8 +271,10 @@ async def bluff(ctx):
     """
     # If a block is initiated, the current player does not believe that the challenger does not have the influence
     if ctx.guild in GAME_LIST and GAME_LIST[ctx.guild].block and ctx.author == GAME_LIST[ctx.guild].current_player.user:
+        GAME_LIST[ctx.guild].bluff = True
         await ctx.send("{} you must show your cards using //show_card!".format(GAME_LIST[ctx.guild].challenger.name))
     elif ctx.author == GAME_LIST[ctx.guild].challenger.user:
+        GAME_LIST[ctx.guild].bluff = True
         await ctx.send("{} you must show your cards using //show_card!".format(
             GAME_LIST[ctx.guild].current_player.name))
     else:
@@ -331,8 +333,6 @@ async def show_card(ctx, index: int):
         await ctx.send(file=discord.File(f'{PATH}\{CARD_PICS[card]}'))
         # If the challenger correctly has the card, actionman must lose one
         if card == GAME_LIST[ctx.guild].current_action:
-            GAME_LIST[ctx.guild].swap[0] = index
-            GAME_LIST[ctx.guild].swap[1] = challenger
             if len(actionman.cards) == 1:
                 discarded_card = actionman.cards.pop(0)
                 await ctx.send("{} discarded {} and is out of the game".format(actionman.name,

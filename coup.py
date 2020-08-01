@@ -122,6 +122,7 @@ class Coup:
     allow_check_number: int
     must_coup: bool
     block: bool
+    bluff: bool
     # Swap is the card index the current player wants to replace
     swap: List
     exchange_cards: List[str]
@@ -143,6 +144,7 @@ class Coup:
         self.swap = []
         self.exchange_cards = []
         self.block = False
+        self.bluff = False
         self.play_again = False
 
     def next_player(self):
@@ -224,7 +226,7 @@ class Coup:
             index += 1
         return "Did not find player, try inputting a valid userid using a mention"
 
-    def discard(self) -> str:
+    def lose_influence(self) -> str:
         """
         Used by the assassin and coup
         Takes away one card from the opposing player, if they only have one card left, they lose the game
@@ -344,7 +346,34 @@ class Coup:
         self.deck.push_bottom(self.exchange_cards.pop(0))
         return "Successfully exchanged cards"
 
-    def show_card(self, ):
+    def show_card(self, index: int):
+        if self.bluff and self.block:
+            statement = "Wut"
+        elif self.bluff:
+            # If the card shown by the current player is true, the challenger must lose of their cards
+            if self.current_player.cards[index] == self.current_action:
+                statement = "{} showed {}.\n {}".format(self.current_player.name, self.current_player.cards[index],
+                                                        self.discard(self.challenger))
+                # Pushes discarded card to the bottom of the deck
+
+                return statement
+            # Otherwise the card is not the same, and the current player must discard said card
+            else:
+                statement = "{} showed {}.\n {}".format(self.current_player.name, self.current_player.cards[index],
+                                                        self.discard(self.challenger, index))
+        elif self.block:
+            statement = "Block"
+        return statement
+
+    def discard(self, player: Player, index: int):
+        """
+
+        """
+        discarded_card = player.cards.pop(index)
+        statement = "{} discarded {}.\n{}".format(player.name, discarded_card, self.next_player())
+        # Pushes discarded card to the bottom of the deck
+        self.deck.push_bottom(discarded_card)
+        return statement
 
 
 def generate_deck() -> Stack:
