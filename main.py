@@ -5,7 +5,7 @@ from typing import Any, List, Optional, Tuple
 
 client = commands.Bot(command_prefix='//')
 # Is used to launch the bot, DO NOT SHARE IT
-TOKEN = "Njg2Mzk1ODU0NjU5MTI1MzQ1.XmWoXA.mzQOJaPytBGPMmu8x77PREFViOQ"
+TOKEN = "Njg2Mzk1ODU0NjU5MTI1MzQ1.XmWl9A.Oy_MwkkvLY75Gp5PsUJmcDDjaQM"
 
 # A game list for each discord server
 # You are allowed one game per server
@@ -105,10 +105,8 @@ async def income(ctx) -> None:
     """
     Player takes 1 coin
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user \
-            and not GAME_LIST[ctx.guild].must_coup:
+    if check(ctx.author, ctx.guild, GAME_LIST[ctx.guild].must_coup, True):
         await ctx.send(GAME_LIST[ctx.guild].income())
-        await ctx.send(GAME_LIST[ctx.guild].GAME_LIST[ctx.guild].next_player())
 
     else:
         if GAME_LIST[ctx.guild].must_coup:
@@ -122,12 +120,10 @@ async def aid(ctx) -> None:
     """
     Player takes 2 coins, can be blocked with a duke
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user \
-            and not GAME_LIST[ctx.guild].must_coup:
+    if check(ctx.author, ctx.guild, GAME_LIST[ctx.guild].must_coup, True):
         GAME_LIST[ctx.guild].current_action = "aid"
         await ctx.send("//allow means you believe them\n"
-                       "//block means you'll block the action with one of your influences\n"
-                       "//bluff means you believe that the current player does not have that influence")
+                       "//block means you'll block the action with one of your influences\n")
     else:
         if GAME_LIST[ctx.guild].must_coup:
             await ctx.send("MUST COUP")
@@ -140,8 +136,7 @@ async def tax(ctx) -> None:
     """
     Player takes 3 coins, is used by the duke
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user \
-            and not GAME_LIST[ctx.guild].must_coup:
+    if check(ctx.author, ctx.guild, GAME_LIST[ctx.guild].must_coup, True):
         GAME_LIST[ctx.guild].current_action = "duke"
         await ctx.send("//allow means you believe them\n"
                        "//block means you'll block the action with one of your influences\n"
@@ -158,8 +153,7 @@ async def coup(ctx, player: str) -> None:
     """
     Player uses 7 coins, to immediately take away a players influence
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user \
-            and not GAME_LIST[ctx.guild].must_coup:
+    if check(ctx.author, ctx.guild, not GAME_LIST[ctx.guild].must_coup, True):
         if GAME_LIST[ctx.guild].current_player.coin >= 7 or GAME_LIST[ctx.guild].must_coup:
             GAME_LIST[ctx.guild].must_coup = False
             GAME_LIST[ctx.guild].current_player.coin -= 7
@@ -189,21 +183,12 @@ async def assassinate(ctx, player: str) -> None:
     """
     Player uses 3 coins, to immediately take away a players influence
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user \
-            and not GAME_LIST[ctx.guild].must_coup:
-        if GAME_LIST[ctx.guild].current_player.user.coin >= 3:
-            GAME_LIST[ctx.guild].current_action = "assassin"
-            GAME_LIST[ctx.guild].current_player.coin -= 3
-            challenger = GAME_LIST[ctx.guild].find_player(player)
-            if challenger is None:
-                await ctx.send("Oi you dont exist")
-                return
-            await ctx.send("{} do you believe in lies, then use //bluff or //block. Otherwise //allow"
-                           .format(challenger[0]))
-        else:
-            await ctx.send("You require more coin")
+    if check(ctx.author, ctx.guild, GAME_LIST[ctx.guild].must_coup, True):
+        await ctx.send(GAME_LIST[ctx.guild].assassin(player))
     else:
-        await ctx.send(".......................................................")
+        if GAME_LIST[ctx.guild].must_coup:
+            await ctx.send("MUST COUP")
+        await ctx.send("Patience is not your strong suit is it")
 
 
 @client.command()
@@ -211,15 +196,14 @@ async def steal(ctx, player: str) -> None:
     """
     Player steals 2 coins from another player, uses captain
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user \
-            and not GAME_LIST[ctx.guild].must_coup:
+    if check(ctx.author, ctx.guild, GAME_LIST[ctx.guild].must_coup, True):
         GAME_LIST[ctx.guild].current_action = "captain"
         challenger = GAME_LIST[ctx.guild].find_player(player)
-        if challenger is None:
+        if challenger is not None:
             await ctx.send("Oi you dont exist")
             return
         await ctx.send("{} do you allow this fool to steal your hard earn cash, then use //bluff or "
-                       "//block. Otherwise //allow".format(challenger[0]))
+                       "//block. Otherwise //allow".format(GAME_LIST[ctx.guild].challenger.name))
         await ctx.send("//allow means you believe them\n"
                        "//block means you'll block the action with one of your influences\n"
                        "//bluff means you believe that the current player does not have that influence")
@@ -234,8 +218,7 @@ async def exchange(ctx) -> None:
     """
     Player wants to exchange one of their cards
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user \
-            and not GAME_LIST[ctx.guild].must_coup:
+    if check(ctx.author, ctx.guild, GAME_LIST[ctx.guild].must_coup, True):
         GAME_LIST[ctx.guild].current_action = "ambassador"
         await ctx.send("//allow means you believe them\n"
                        "//block means you'll block the action with one of your influences\n"
@@ -254,6 +237,8 @@ async def allow(ctx):
     if ctx.guild in GAME_LIST and ctx.author != GAME_LIST[ctx.guild].current_player.user \
             and not GAME_LIST[ctx.guild].must_coup:
         await ctx.send(GAME_LIST[ctx.guild].allow(ctx.author))
+        if GAME_LIST[ctx.guild].current_action == "ambassador":
+            await show_cards(GAME_LIST[ctx.guild].current_player)
     else:
         if GAME_LIST[ctx.guild].must_coup:
             await ctx.send("MUST COUP")
@@ -270,13 +255,15 @@ async def bluff(ctx):
     Otherwise, the current player does not have it, therefore must discard it
     """
     # If a block is initiated, the current player does not believe that the challenger does not have the influence
-    if ctx.guild in GAME_LIST and GAME_LIST[ctx.guild].block and ctx.author == GAME_LIST[ctx.guild].current_player.user:
+    if ctx.guild in GAME_LIST:
+        if GAME_LIST[ctx.guild].block and ctx.author == GAME_LIST[ctx.guild].current_player.user:
+            name = GAME_LIST[ctx.guild].challenger.name
+        elif ctx.author == GAME_LIST[ctx.guild].challenger.user:
+            name = GAME_LIST[ctx.guild].current_player.name
+        else:
+            name = ctx.author.name
         GAME_LIST[ctx.guild].bluff = True
-        await ctx.send("{} you must show your cards using //show_card!".format(GAME_LIST[ctx.guild].challenger.name))
-    elif ctx.author == GAME_LIST[ctx.guild].challenger.user:
-        GAME_LIST[ctx.guild].bluff = True
-        await ctx.send("{} you must show your cards using //show_card!".format(
-            GAME_LIST[ctx.guild].current_player.name))
+        await ctx.send("{} you must show your cards using //show_card!".format(name))
     else:
         await ctx.send("Wait ya turn")
 
@@ -293,6 +280,7 @@ async def block(ctx):
     if ctx.guild in GAME_LIST and GAME_LIST[ctx.guild].current_action in ["duke", "aid", "ambassador"]:
         await ctx.send("Come on silly you can't block that!")
     else:
+        print(GAME_LIST[ctx.guild].challenger, GAME_LIST[ctx.guild].challenger.user)
         if ctx.author == GAME_LIST[ctx.guild].challenger.user:
             await ctx.send("{} do you believe in the heart of the cards, that {} is lying!"
                            "\nThen use //bluff\nOtherwise use //allow"
@@ -310,62 +298,17 @@ async def show_card(ctx, index: int):
     the other player must discard one of their cards
     Otherwise they must discard the card they showed
     """
-    flag = False
-    # If the challenger believes that the current player is lying
-    if ctx.author == GAME_LIST[ctx.guild].challenger.user:
-        challenger = GAME_LIST[ctx.guild].challenger
-        actionman = GAME_LIST[ctx.guild].current_player
-        flag = True
-    # If the current player believes that the challenger is lying
-    elif ctx.author == GAME_LIST[ctx.guild].current_player.user:
-        challenger = GAME_LIST[ctx.guild].current_player
-        actionman = GAME_LIST[ctx.guild].challenger
-        flag = True
+    if ctx.guild in GAME_LIST and (ctx.author == GAME_LIST[ctx.guild].current_player.user or
+                                   ctx.author == GAME_LIST[ctx.guild].challenger.user) and (
+            GAME_LIST[ctx.guild].bluff or
+            GAME_LIST[ctx.guild].block):
+        await ctx.send(GAME_LIST[ctx.guild].show_card(index))
+        await ctx.send(embed=command_list())
+        # DM's the current player and challenger their current set of cards
+        await show_cards(GAME_LIST[ctx.guild].current_player)
+        await show_cards(GAME_LIST[ctx.guild].challenger)
     else:
-        await ctx.send("Do you want everyone to know your cards?")
-
-    # If a block was used to initialize this state, set block to false
-    if GAME_LIST[ctx.guild].block:
-        GAME_LIST[ctx.guild].block = False
-    # Only happens if a player is legitimately showing a card
-    if flag:
-        card = challenger.cards[index]
-        await ctx.send(file=discord.File(f'{PATH}\{CARD_PICS[card]}'))
-        # If the challenger correctly has the card, actionman must lose one
-        if card == GAME_LIST[ctx.guild].current_action:
-            if len(actionman.cards) == 1:
-                discarded_card = actionman.cards.pop(0)
-                await ctx.send("{} discarded {} and is out of the game".format(actionman.name,
-                                                                               discarded_card))
-                GAME_LIST[ctx.guild].GAME_LIST[ctx.guild].lose()
-                await ctx.send(GAME_LIST[ctx.guild].next_player())
-            else:
-                await ctx.send("{} discard a card!\n Use //discard index".format(actionman.name))
-            await show_cards(actionman)
-            await ctx.send("{} use //swap if you wish to swap out the card you just showed\nOtherwise do nothing"
-                           .format(challenger.name))
-
-        # Otherwise challenger loses said card
-        else:
-            discarded_card = challenger.cards.pop(0)
-            # If the player has no cards left
-            if len(challenger.cards) == 0:
-                await ctx.send(
-                    "{} discarded {} and is out of the game".format(challenger.name, discarded_card))
-                GAME_LIST[ctx.guild].lose()
-            else:
-                await ctx.send("{} discarded {}".format(challenger.name, discarded_card))
-                await show_cards(challenger)
-
-            if len(GAME_LIST[ctx.guild].players) > 1:
-                await ctx.send(GAME_LIST[ctx.guild].action())
-                # DM's the current player the top two cards in the deck
-                if GAME_LIST[ctx.guild].current_action == "ambassador":
-                    await exchange_cards(GAME_LIST[ctx.guild].current_player, GAME_LIST[ctx.guild].exchange_cards)
-                    # Skips going to the next player
-                    return
-            await ctx.send(GAME_LIST[ctx.guild].next_player())
-            await ctx.send(embed=command_list())
+        print("oh no")
 
 
 @client.command()
@@ -373,11 +316,11 @@ async def discard(ctx, index: int):
     """
     If current player used a coup or an assassin, the challenger must discard one of their cards
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].challenger.user:
+    # Checks if the right player is discarding a card and if a discard is allowed
+    if ctx.guild in GAME_LIST and GAME_LIST[ctx.guild].discard[0] and ctx.author == GAME_LIST[ctx.guild].discard[
+        1].user:
         if 0 <= index < len(GAME_LIST[ctx.guild].challenger.cards):
-            discarded_card = GAME_LIST[ctx.guild].challenger.cards.pop(index)
-            await ctx.send("{} discarded {}".format(GAME_LIST[ctx.guild].challenger.name, discarded_card))
-            await ctx.send(GAME_LIST[ctx.guild].next_player())
+            await ctx.send(GAME_LIST[ctx.guild].discard_card(GAME_LIST[ctx.guild].discard[1], index))
             await ctx.send(embed=command_list())
 
         else:
@@ -391,7 +334,8 @@ async def choice(ctx, index: int):
     """
     After seeing what the top 2 cards are, the player can choose which one they want to exchange
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].challenger.user:
+    if check(ctx.author, ctx.guild, GAME_LIST[ctx.guild].must_coup, True) and \
+            GAME_LIST[ctx.guild].current_action == "ambassador":
         if 0 <= index < 2:
             # Makes a list for the cards that must be put at the bottom of the deck
             GAME_LIST[ctx.guild].deck.push_bottom(
@@ -412,7 +356,7 @@ async def swap(ctx, card_away: int = 0, card_want: int = 0):
     Otherwise, if an opponents bluff was incorrect they can swap the card that was shown for a card that is on top of the
     deck.
     """
-    if ctx.guild in GAME_LIST and ctx.author == GAME_LIST[ctx.guild].current_player.user and \
+    if check(ctx.author, ctx.guild, GAME_LIST[ctx.guild].must_coup) and \
             GAME_LIST[ctx.guild].current_action == "ambassador":
         # Makes sure the current player puts in the right indexes for the cards
         if 0 <= card_away < 2 and 0 <= card_want < 2:
@@ -439,8 +383,24 @@ async def end(ctx):
     """
     If the game ends up in a softlock, end the game
     """
-    GAME_LIST.pop(ctx.guild)
-    await ctx.send("GAME OVER")
+    try:
+        GAME_LIST.pop(ctx.guild)
+        await ctx.send("GAME OVER")
+    except KeyError:
+        await ctx.send("Bro the server doesn't even have a game running")
+
+
+def check(author, guild, must_coup, check_challenger=False) -> bool:
+    """
+    Checks if the player commiting an action can.
+    Helps clean up the code
+    """
+    if check_challenger and guild in GAME_LIST and author == GAME_LIST[guild].challenger.user and not must_coup:
+        return True
+    elif guild in GAME_LIST and author == GAME_LIST[guild].current_player.user and not must_coup:
+        return True
+    else:
+        return False
 
 
 # Launches the bot on discord

@@ -100,7 +100,7 @@ class Player:
             self.name = user.nick
         self.user = user
         self.id = user.id
-        self.coin = 2
+        self.coin = 5
         self.cards = []
 
 
@@ -123,6 +123,7 @@ class Coup:
     must_coup: bool
     block: bool
     bluff: bool
+    discard = Tuple[bool, Player]
     # Swap is the card index the current player wants to replace
     swap: List
     exchange_cards: List[str]
@@ -145,6 +146,7 @@ class Coup:
         self.exchange_cards = []
         self.block = False
         self.bluff = False
+        self.discard = (False, None)
         self.play_again = False
 
     def next_player(self):
@@ -216,34 +218,27 @@ class Coup:
         """
         Finds the player using the id given by the mention by looking through the players list
         """
+        # If the userid is a nickname
+        if userid[2] == "!":
+            userid = int(userid[3:-1])
+        else:
+            userid = int(userid[2:-1])
         index = 0
         while index < len(self.players):
             if self.players[index].id != self.current_player.id:
                 if self.players[index].id == userid:
                     self.challenger = self.players[index]
                     self.challenger_index = index
+                    print(self.challenger)
                     return None
             index += 1
         return "Did not find player, try inputting a valid userid using a mention"
 
-    def lose_influence(self) -> str:
-        """
-        Used by the assassin and coup
-        Takes away one card from the opposing player, if they only have one card left, they lose the game
-        """
-        if len(self.challenger.cards) == 1:
-            self.lose()
-            return "{} discarded {} and is out of the game".format(self.challenger.name,
-                                                                   self.challenger.cards.pop(0))
-        else:
-            self.current_action = "coup"
-            return "{} use //discard <index> to discard one of your cards".format(self.challenger.name)
-
-    def lose(self):
+    def lose(self, index):
         """
         If a player is out of the cards, they are kicked from the game
         """
-        self.players.pop(self.challenger_index)
+        self.players.pop(index)
         if self.total_players_left - 1 == self.current_player_index:
             self.current_player_index = 0
         self.total_players_left -= 1
@@ -252,6 +247,9 @@ class Coup:
     def allow(self, player: discord.member):
         if self.allow_check[player]:
             return "{}, you already allowed".format(player.name)
+        # If a block is initialized and checks that if its the current player
+        elif self.block and player == self.current_player:
+            return self.next_player()
         else:
             self.allow_check[player] = True
             self.allow_check_number += 1
@@ -260,8 +258,7 @@ class Coup:
                 # Resets allow_check back to false
                 for user in self.allow_check:
                     self.allow_check[user] = False
-                return "{} allows {} action\n{}\n{}" \
-                    .format(player.name, self.current_player.name, self.action(), self.next_player())
+                return "{} allows {} action\n{}".format(player.name, self.current_player.name, self.action())
             return "{} allows {} action".format(player.name, self.current_player.name)
 
     def block(self, player: discord.member):
@@ -289,14 +286,15 @@ class Coup:
         elif self.current_action == "duke":
             text = self.tax()
         elif self.current_action == "assassin" or self.current_action == "coup":
-            text = self.discard()
+            text = self.lose_influence()
+            self.discard = (True, self.challenger)
         elif self.current_action == "captain":
             text = self.steal()
         # Ambassador
         else:
             self.exchange_cards = self.deck.pop2()
             return "{} select ur card by using //swap <index of the card you want to give up> <index of the card " \
-                   "\you want> in the channel".format(self.current_player.name)
+                   "you want in the channel>".format(self.current_player.name)
 
         return text
 
@@ -305,21 +303,21 @@ class Coup:
         Current player takes 1 coin
         """
         self.current_player.coin += 1
-        return "{} now has {} coins".format(self.current_player.name, self.current_player.coin)
+        return "{} now has {} coins\n{}".format(self.current_player.name, self.current_player.coin, self.next_player())
 
     def aid(self) -> str:
         """
         Current player takes 2 coins
         """
         self.current_player.coin += 2
-        return "{} now has {} coins".format(self.current_player.name, self.current_player.coin)
+        return "{} now has {} coins\n{}".format(self.current_player.name, self.current_player.coin, self.next_player())
 
     def tax(self) -> str:
         """
         Current player uses the duke and gets 3 coins
         """
         self.current_player.coin += 3
-        return "{} now has {} coins".format(self.current_player.name, self.current_player.coin)
+        return "{} now has {} coins\n{}".format(self.current_player.name, self.current_player.coin, self.next_player())
 
     def steal(self) -> str:
         """
@@ -331,8 +329,39 @@ class Coup:
             self.challenger.coin -= 1
         else:
             return "LOOOOOOOOOOOOOOOOOOL you just took 0 coins cause they had 0 coins\nWhat a bunch of jokers"
-        return "{} now has {} coins\n{} now has {}".format(self.challenger.name, self.challenger.coin,
-                                                           self.current_player.name, self.current_player.coin)
+        return "{} now has {} coins\n{} now has {}\n{}".format(self.challenger.name, self.challenger.coin,
+                                                               self.current_player.name, self.current_player.coin,
+                                                               self.next_player())
+
+    def assassin(self, challenger: discord.member) -> str:
+        """
+        Takes away 3 coins from the current player and sets the challenger to whom the current player chooses
+        """
+        if self.current_player.coin >= 3:
+            challenger = self.find_player(challenger)
+            # If the player does not exist
+            if challenger is not None:
+                return challenger
+            self.current_action = "assassin"
+            self.current_player.coin -= 3
+            return "{} do you believe in lies, then use //bluff or //block. Otherwise //allow".format(
+                self.challenger.name)
+        else:
+            return "You require more coin"
+
+    def lose_influence(self) -> str:
+        """
+        Used by the assassin and coup
+        Takes away one card from the opposing player, if they only have one card left, they lose the game
+        """
+        if len(self.challenger.cards) == 1:
+            self.lose(self.challenger_index)
+            return "{} discarded {} and is out of the game!\n{}".format(self.challenger.name,
+                                                                        self.challenger.cards.pop(0),
+                                                                        self.next_player())
+        else:
+            self.current_action = "coup"
+            return "{} use //discard <index> to discard one of your cards".format(self.challenger.name)
 
     def exchange(self, card_away: int, card_want: int) -> str:
         """
@@ -344,36 +373,59 @@ class Coup:
         self.current_player.cards.append(self.exchange_cards.pop(card_want))
         # Pushes the last card in self.exchange_cards to the bottom
         self.deck.push_bottom(self.exchange_cards.pop(0))
-        return "Successfully exchanged cards"
+        return "Successfully exchanged cards\n".format(self.next_player())
 
     def show_card(self, index: int):
+        # The challenger needs to prove that they have the card
         if self.bluff and self.block:
-            statement = "Wut"
-        elif self.bluff:
-            # If the card shown by the current player is true, the challenger must lose of their cards
-            if self.current_player.cards[index] == self.current_action:
-                statement = "{} showed {}.\n {}".format(self.current_player.name, self.current_player.cards[index],
-                                                        self.discard(self.challenger))
-                # Pushes discarded card to the bottom of the deck
+            actionman = self.challenger
+            actionman_index = self.challenger_index
+            challenger = self.current_player
+            challenger_index = self.current_player_index
+        # The current player needs to prove that they have the card
+        else:
+            actionman = self.current_player
+            actionman_index = self.current_player_index
+            challenger = self.challenger
+            challenger_index = self.challenger_index
 
-                return statement
-            # Otherwise the card is not the same, and the current player must discard said card
+        # If the actionman has the actual card, and their action goes through
+        if actionman.cards[index] == self.current_action:
+            self.discard_card(challenger, index)
+            if len(challenger.cards) == 1:
+                statement = "{} And is out of the game!".format(self.discard_card(challenger, 0))
+                self.lose(challenger_index)
             else:
-                statement = "{} showed {}.\n {}".format(self.current_player.name, self.current_player.cards[index],
-                                                        self.discard(self.challenger, index))
-        elif self.block:
-            statement = "Block"
-        return statement
+                self.discard = (True, challenger)
+                # Challenger must discard to continue the game
+                return "{} discard a card!\n Use //discard index".format(actionman.name)
 
-    def discard(self, player: Player, index: int):
+            # If the current action is an assassin and the challenger has no cards because their bluff was incorrect
+            # The action does not happen
+            if self.current_action == "assassin" and len(challenger.cards) == 0:
+                return "{}\n{} puts {} to the bottom of the deck and receives a new card" \
+                    .format(statement, self.current_player.name, self.current_action)
+            else:
+                return "{}\n{} puts {} to the bottom of the deck and receives a new card\n{}" \
+                    .format(statement, self.current_player.name, self.current_action, self.action())
+
+        # Otherwise they lose the card
+        else:
+            if len(actionman.cards) == 1:
+                statement = "{} and is out of the game!".format(actionman.name,
+                                                                self.discard_card(actionman, 0))
+                self.lose(actionman_index)
+            else:
+                statement = self.discard_card(actionman, index)
+            return statement
+
+    def discard_card(self, player: Player, index: int):
         """
-
+        Pushes the specified card to the bottom of the deck
         """
         discarded_card = player.cards.pop(index)
-        statement = "{} discarded {}.\n{}".format(player.name, discarded_card, self.next_player())
-        # Pushes discarded card to the bottom of the deck
         self.deck.push_bottom(discarded_card)
-        return statement
+        return "{} discarded {}.\n{}".format(player.name, discarded_card, self.next_player())
 
 
 def generate_deck() -> Stack:
@@ -389,32 +441,3 @@ def generate_deck() -> Stack:
         deck.push(cards.pop(-1))
         length_cards -= 1
     return deck
-
-
-def command_list():
-    """
-    Returns an embed of all the commands
-    """
-    embed = discord.Embed()
-    embed.add_field(name='Action', value="Command")
-    embed.add_field(name='Income:', value="//income")
-    embed.add_field(name='Foreign Aid:', value="//aid")
-    embed.add_field(name='Tax:', value="//tax")
-    embed.add_field(name='Coup:', value="//coup @user")
-    embed.add_field(name='Assassinate:', value="//assassinate @user")
-    embed.add_field(name='Steal:', value="//steal @user")
-    embed.add_field(name='Exchange:', value="// exchange <index>")
-    return embed
-
-
-async def show_cards(player: Player):
-    """
-    Shows the players cards
-    """
-    await player.user.create_dm()
-    await player.user.dm_channel.send("{}'s cards\n{} coins".format(player.name, player.coin))
-    index = 0
-    for card in player.cards:
-        await player.user.dm_channel.send("{}. {}".format(index, card))
-        await player.user.dm_channel.send(file=discord.File(f'{PATH}\{CARD_PICS[card]}'))
-        index += 1
