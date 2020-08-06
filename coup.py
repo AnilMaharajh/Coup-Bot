@@ -100,7 +100,7 @@ class Player:
             self.name = user.nick
         self.user = user
         self.id = user.id
-        self.coin = 5
+        self.coin = 2
         self.cards = []
 
 
