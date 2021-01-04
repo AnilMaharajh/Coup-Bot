@@ -5,7 +5,7 @@ from typing import Any, List, Optional, Tuple
 
 client = commands.Bot(command_prefix='//')
 # Is used to launch the bot, DO NOT SHARE IT
-TOKEN = "Njg2Mzk1ODU0NjU5MTI1MzQ1.XmWl9A.Oy_MwkkvLY75Gp5PsUJmcDDjaQM"
+TOKEN = ""
 
 # A game list for each discord server
 # You are allowed one game per server
